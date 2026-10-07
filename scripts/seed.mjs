@@ -43,7 +43,7 @@ async function main() {
       { platform: "linkedin", label: "LinkedIn", status: "connected", updatedAt: now },
       { platform: "x", label: "X", status: "reconnect", updatedAt: now },
       { platform: "instagram", label: "Instagram", status: "connected", updatedAt: now },
-      { platform: "facebook", label: "Facebook", status: "not_connected", updatedAt: now },
+      { platform: "facebook", label: "Facebook", status: "connected", updatedAt: now },
     ]);
     console.log("Seeded accounts");
   }
@@ -217,7 +217,7 @@ async function main() {
     {
       topic: "Manual invoicing costs",
       ...manualInvoicing,
-      platforms: ["linkedin", "x", "instagram"],
+      platforms: ["linkedin", "x", "instagram", "facebook"],
       imageMode: "ai",
       imagePrompt: "Flat illustration, muted colours, a desk with papers",
       content: {
@@ -235,6 +235,11 @@ async function main() {
           text: "Eleven hours a week, gone to copy-paste.\n\nOne client was moving invoice numbers from email to spreadsheet to accounting software by hand. Then chasing everyone who hadn't paid.\n\nWe rebuilt the whole thing in two days. Now the invoice arrives and everything happens on its own.\n\nWhat's the dumbest manual job still eating your week?",
           hashtags: ["automation", "n8n", "smallbusiness", "invoicing", "productivity"],
           suggestedHashtags: ["nocode", "workflow", "bookkeeping", "freelance", "accounting"],
+        },
+        facebook: {
+          text: "A client of ours called last month. Her accountant had just quit.\n\nTurns out she was spending 11 hours a week on invoices — copying numbers from emails into a spreadsheet, then into the accounting software, then chasing down the people who hadn't paid.\n\nWe rebuilt it in two days. Now the invoice arrives, the data gets pulled out automatically, and a reminder goes out on day 7 if nobody's paid.\n\nWhat's the most tedious manual task still eating up your week?",
+          hashtags: ["automation", "smallbusiness", "invoicing"],
+          suggestedHashtags: ["nocode", "workflow", "bookkeeping"],
         },
       },
       warnings: ['"11 hours" has no source — check before posting'],

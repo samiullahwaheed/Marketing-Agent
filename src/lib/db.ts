@@ -46,7 +46,7 @@ const DEFAULT_ACCOUNTS: Array<Pick<AccountDoc, "platform" | "label" | "status">>
   { platform: "linkedin", label: "LinkedIn", status: "connected" },
   { platform: "x", label: "X", status: "reconnect" },
   { platform: "instagram", label: "Instagram", status: "connected" },
-  { platform: "facebook", label: "Facebook", status: "not_connected" },
+  { platform: "facebook", label: "Facebook", status: "connected" },
 ];
 
 export async function getAccounts(): Promise<Account[]> {
