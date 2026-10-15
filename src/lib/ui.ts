@@ -1,6 +1,6 @@
 /** Shared class strings for form controls. */
 export const inputClass =
-  "w-full min-h-[46px] px-3.5 py-[11px] border border-control rounded-[10px] text-[15px] font-normal leading-[1.45] text-ink bg-card font-sans focus:outline-2 focus:outline-primary focus:outline-offset-1";
+  "w-full min-h-[46px] px-3.5 py-[11px] border border-control rounded-[10px] text-[15px] font-normal leading-[1.45] text-ink bg-white/70 backdrop-blur-sm font-sans focus:outline-2 focus:outline-primary focus:outline-offset-1";
 
 export const labelClass = "flex flex-col gap-[7px] font-bold text-[14.5px]";
 

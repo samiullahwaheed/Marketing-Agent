@@ -60,7 +60,7 @@ export default function RejectView({ post, bannedWords }: { post: Post; bannedWo
       <PageHeader size="md" title="Reject this post?" subtitle="It won't be published. Telling the agent why helps it write better next time." />
 
       <div className="grid gap-5 items-start grid-cols-[repeat(auto-fit,minmax(min(380px,100%),1fr))]">
-        <section className="bg-subtle border border-border rounded-2xl px-6 py-[22px] flex flex-col gap-3.5">
+        <section className="bg-white/35 backdrop-blur-md border border-white/50 rounded-2xl px-6 py-[22px] flex flex-col gap-3.5">
           <p className="eyebrow">The post</p>
           <div className="flex gap-3.5 items-center">
             <PostImage className="w-24" aspect="1/1" />
@@ -123,7 +123,7 @@ export default function RejectView({ post, bannedWords }: { post: Post; bannedWo
         </Card>
       </div>
 
-      <div className="bg-card border border-border rounded-2xl px-[18px] py-3.5 flex flex-wrap gap-3 items-center justify-end">
+      <div className="bg-white/55 backdrop-blur-xl backdrop-saturate-150 border border-white/60 rounded-2xl px-[18px] py-3.5 flex flex-wrap gap-3 items-center justify-end">
         <span className="text-muted text-[13.5px] mr-auto">
           {saveError ? <span className="text-error font-semibold">{saveError}</span> : "You can find it later under Approvals › Rejected."}
         </span>

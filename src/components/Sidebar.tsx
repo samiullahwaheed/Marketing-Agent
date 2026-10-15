@@ -65,7 +65,7 @@ export default function Sidebar({
   const low = aiCreditsPercent <= 20;
 
   return (
-    <nav aria-label="Main" className="flex flex-col gap-[22px] px-4 pt-6 pb-7 bg-card text-ink">
+    <nav aria-label="Main" className="flex flex-col gap-[22px] px-4 pt-6 pb-7 text-ink">
       {showLogo && <Logo />}
 
       <Link
@@ -93,7 +93,7 @@ export default function Sidebar({
         <NavItem href="/settings" icon={SlidersHorizontal} label="Settings" />
       </div>
 
-      <div className="border border-border rounded-xl p-3.5 flex flex-col gap-2.5 bg-subtle">
+      <div className="border border-white/55 rounded-xl p-3.5 flex flex-col gap-2.5 bg-white/40 backdrop-blur-md">
         <div className="flex justify-between items-baseline gap-2">
           <span className="font-bold text-sm">AI credits</span>
           {low && <span className="text-[13px] text-warning font-semibold">Running low</span>}

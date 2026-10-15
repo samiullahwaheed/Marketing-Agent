@@ -39,7 +39,9 @@ function Segment({ on, onClick, children }: { on: boolean; onClick: () => void; 
       aria-pressed={on}
       onClick={onClick}
       className={`flex-[1_1_120px] min-h-[46px] px-3 py-2 border rounded-[10px] text-sm font-semibold text-left cursor-pointer ${
-        on ? "bg-primary-light border-primary text-primary-hover shadow-[inset_0_0_0_1px_#1F5C46]" : "bg-card border-control text-ink hover:bg-page"
+        on
+          ? "bg-primary-light border-primary text-primary-hover shadow-[inset_0_0_0_1px_#1F5C46]"
+          : "bg-white/50 backdrop-blur-md border-control text-ink hover:bg-white/75"
       }`}
     >
       {children}

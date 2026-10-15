@@ -41,7 +41,14 @@
 @layer base {
   body {
     margin: 0;
-    background: var(--color-page);
+    background-color: var(--color-page);
+    /* Soft, fixed brand-colour light for glass surfaces to refract — not a generic gradient. */
+    background-image:
+      radial-gradient(1100px 650px at 8% -8%, color-mix(in srgb, var(--color-primary) 20%, transparent), transparent 60%),
+      radial-gradient(900px 520px at 96% 4%, color-mix(in srgb, var(--color-marigold) 22%, transparent), transparent 55%),
+      radial-gradient(1000px 600px at 50% 105%, color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 60%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
     color: var(--color-ink);
     font-family: var(--font-sans);
     font-size: 15px;

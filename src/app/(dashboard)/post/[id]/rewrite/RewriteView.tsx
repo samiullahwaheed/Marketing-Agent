@@ -93,7 +93,7 @@ export default function RewriteView({ post }: { post: Post }) {
       </Card>
 
       <div className="grid gap-5 items-stretch grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))]">
-        <section className="bg-subtle border border-border rounded-2xl px-6 py-[22px] flex flex-col gap-3.5">
+        <section className="bg-white/35 backdrop-blur-md border border-white/50 rounded-2xl px-6 py-[22px] flex flex-col gap-3.5">
           <p className="eyebrow">Current version</p>
           <div className="text-nav text-[15px] flex flex-col gap-3">
             {paragraphs(currentText).map((p, i) => (
@@ -103,7 +103,7 @@ export default function RewriteView({ post }: { post: Post }) {
             ))}
           </div>
         </section>
-        <section className="bg-card border-2 border-primary rounded-2xl px-6 py-[22px] flex flex-col gap-3.5 items-start justify-center" aria-live="polite">
+        <section className="bg-white/60 backdrop-blur-xl border-2 border-primary rounded-2xl px-6 py-[22px] flex flex-col gap-3.5 items-start justify-center" aria-live="polite">
           {requested ? (
             <div className="flex gap-3 items-start text-success">
               <CheckCircle2 size={22} strokeWidth={2} className="flex-none mt-0.5" aria-hidden="true" />
@@ -120,7 +120,7 @@ export default function RewriteView({ post }: { post: Post }) {
         </section>
       </div>
 
-      <div className="bg-card border border-border rounded-2xl px-[18px] py-3.5 flex flex-wrap gap-3 items-center justify-end">
+      <div className="bg-white/55 backdrop-blur-xl backdrop-saturate-150 border border-white/60 rounded-2xl px-[18px] py-3.5 flex flex-wrap gap-3 items-center justify-end">
         <span className="text-muted text-[13.5px] mr-auto">Your current version stays until the rewrite comes back.</span>
         <Button to={`/post/${post.id}/review`}>{requested ? "Back to post" : "Cancel"}</Button>
       </div>

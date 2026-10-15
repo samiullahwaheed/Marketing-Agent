@@ -16,7 +16,7 @@ function Hero() {
         <div className="absolute -right-2 -top-3.5 rotate-[4deg] bg-marigold-soft text-[#3B2A08] rounded-xl px-4 py-3 text-sm font-semibold max-w-[210px] shadow-[0_10px_24px_rgba(0,0,0,.18)]">
           Heads up: &ldquo;11 hours a week&rdquo; needs a source before this goes out.
         </div>
-        <div className="bg-card text-ink rounded-2xl p-5 -rotate-2 shadow-[0_20px_40px_rgba(0,0,0,.22)] flex flex-col gap-3 max-w-[380px]">
+        <div className="bg-white/80 backdrop-blur-xl backdrop-saturate-150 border border-white/50 text-ink rounded-2xl p-5 -rotate-2 shadow-[0_20px_40px_rgba(0,0,0,.22)] flex flex-col gap-3 max-w-[380px]">
           <span className="self-start bg-warning-bg text-warning text-xs font-bold rounded-full px-2.5 py-[3px]">
             Waiting for you
           </span>

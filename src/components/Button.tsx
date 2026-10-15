@@ -15,12 +15,14 @@ const sizes = {
 };
 
 const variants: Record<ButtonVariant, string> = {
+  // Solid — reserved for the one action a screen wants you to take.
   primary: "border-primary bg-primary text-white hover:bg-primary-hover hover:border-primary-hover hover:text-white",
-  secondary: "border-control bg-card text-ink hover:bg-page hover:text-ink",
   danger: "border-danger bg-danger text-white hover:bg-danger-hover hover:border-danger-hover hover:text-white",
-  dangerOutline: "border-[#E3BDB7] bg-card text-danger hover:bg-page hover:text-danger",
+  // Glass — everything else sits on frosted, translucent ground.
+  secondary: "border-white/60 bg-white/50 backdrop-blur-md text-ink hover:bg-white/75 hover:text-ink",
+  dangerOutline: "border-[#E3BDB7]/80 bg-white/50 backdrop-blur-md text-danger hover:bg-white/75 hover:text-danger",
   // Text colour is inherited so callers can tint it (e.g. a red "Remove")
-  ghost: "border-transparent bg-transparent hover:bg-page",
+  ghost: "border-transparent bg-transparent hover:bg-white/45 hover:backdrop-blur-md",
 };
 
 type Props = {

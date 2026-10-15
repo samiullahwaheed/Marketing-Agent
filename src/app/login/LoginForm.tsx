@@ -5,7 +5,7 @@ import { PasswordInput } from "@/components/AuthLayout";
 import { loginAction } from "./actions";
 
 const authInput =
-  "w-full min-h-12 px-3.5 py-[11px] border border-control rounded-[10px] text-[15px] leading-[1.4] text-ink bg-card font-sans";
+  "w-full min-h-12 px-3.5 py-[11px] border border-control rounded-[10px] text-[15px] leading-[1.4] text-ink bg-white/70 backdrop-blur-sm font-sans";
 const fieldLabel = "flex flex-col gap-1.5 font-semibold text-sm";
 
 export default function LoginForm({ error, next }: { error: boolean; next: string }) {

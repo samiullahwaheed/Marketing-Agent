@@ -27,18 +27,18 @@ export default function AppLayout({
 
   return (
     <div className="min-h-screen lg:flex">
-      <aside className="hidden lg:block w-60 flex-none bg-card border-r border-border">
+      <aside className="hidden lg:block w-60 flex-none bg-white/50 backdrop-blur-xl backdrop-saturate-150 border-r border-white/55">
         <div className="sticky top-0 max-h-screen overflow-y-auto">
           <Sidebar {...sidebarProps} />
         </div>
       </aside>
 
-      <header className="lg:hidden sticky top-0 z-20 bg-card border-b border-border">
+      <header className="lg:hidden sticky top-0 z-20 bg-white/60 backdrop-blur-xl backdrop-saturate-150 border-b border-white/55">
         <div className="flex items-center justify-between h-16 px-4">
           <Logo />
           <button
             type="button"
-            className="w-11 h-11 flex items-center justify-center rounded-[10px] border border-control bg-card text-ink cursor-pointer hover:bg-page"
+            className="w-11 h-11 flex items-center justify-center rounded-[10px] border border-white/60 bg-white/50 backdrop-blur-md text-ink cursor-pointer hover:bg-white/75"
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
             aria-controls="mobile-menu"
@@ -48,7 +48,7 @@ export default function AppLayout({
           </button>
         </div>
         {menuOpen && (
-          <div id="mobile-menu" className="border-t border-border max-h-[calc(100vh-4rem)] overflow-y-auto">
+          <div id="mobile-menu" className="bg-white/60 backdrop-blur-xl backdrop-saturate-150 border-t border-white/55 max-h-[calc(100vh-4rem)] overflow-y-auto">
             <Sidebar showLogo={false} {...sidebarProps} />
           </div>
         )}

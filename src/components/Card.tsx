@@ -3,13 +3,19 @@ import type { ElementType, ReactNode } from "react";
 export function Card({
   as: Tag = "section",
   className = "",
+  /** Set false when the caller supplies its own background/border (avoids conflicting bg-* utilities). */
+  glass = true,
   children,
 }: {
   as?: ElementType;
   className?: string;
+  glass?: boolean;
   children: ReactNode;
 }) {
-  return <Tag className={`bg-card border border-border rounded-2xl ${className}`}>{children}</Tag>;
+  const base = glass
+    ? "bg-white/55 backdrop-blur-xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_rgba(23,32,28,0.10)]"
+    : "";
+  return <Tag className={`${base} rounded-2xl ${className}`}>{children}</Tag>;
 }
 
 /** Card title row: heading on the left, optional link or chip on the right. */

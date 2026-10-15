@@ -33,7 +33,14 @@ function AudienceCard({ audience, onSave, onDismiss }: { audience: Audience; onS
   return (
     <Card
       as="article"
-      className={`p-[22px] flex flex-col gap-3 ${isDefault ? "border-2 border-primary" : suggested ? "border-dashed border-[#9AA59E] bg-subtle" : ""}`}
+      glass={!isDefault && !suggested}
+      className={`p-[22px] flex flex-col gap-3 ${
+        isDefault
+          ? "bg-white/55 backdrop-blur-xl backdrop-saturate-150 border-2 border-primary shadow-[0_8px_32px_rgba(23,32,28,0.10)]"
+          : suggested
+            ? "bg-white/30 backdrop-blur-md border border-dashed border-[#9AA59E]"
+            : ""
+      }`}
     >
       <div className="flex justify-between gap-2.5 items-start">
         <h3 className="heading text-xl">{audience.name}</h3>
