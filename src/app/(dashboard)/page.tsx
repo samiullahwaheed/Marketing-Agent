@@ -1,12 +1,37 @@
+import { Clock, Lightbulb, Plus, TriangleAlert, Unlink } from "lucide-react";
 import Link from "next/link";
-import { RotateCw, Clock, AlertTriangle } from "lucide-react";
 import { getHomeData, getAccounts, getSettings, postsCollection } from "@/lib/db";
-import { todayLong, relativeDays, formatDayMonth } from "@/lib/format";
+import { todayLong, formatDayMonth, shortDay } from "@/lib/format";
 import { PLATFORMS } from "@/lib/platforms";
-import StatusDot from "@/components/StatusDot";
-import Pill from "@/components/Pill";
-import PlatformIcon from "@/components/PlatformIcon";
-import { statusDotColor } from "@/lib/status";
+import { postLink } from "@/lib/status";
+import { Button } from "@/components/Button";
+import { Card, CardHeader } from "@/components/Card";
+import { Chip } from "@/components/Chip";
+import { PlatformBadge } from "@/components/PlatformBadge";
+import { PageHeader } from "@/components/PageHeader";
+import { StatCard } from "@/components/StatCard";
+
+const row = "flex flex-wrap items-center py-4 border-t border-divider";
+
+interface NeedsYouItem {
+  id: string;
+  tone: "warning" | "error";
+  icon: "clock" | "unlink" | "alert";
+  title: string;
+  detail: string;
+  action: { label: string; href: string; variant: "primary" | "secondary" };
+}
+
+const needsYouIcons = { clock: Clock, unlink: Unlink, alert: TriangleAlert };
+const needsYouBox = {
+  warning: "bg-warning-bg text-warning",
+  error: "bg-error-bg text-error",
+};
+
+function sumViews(post: { results?: Partial<Record<string, { views?: number }>> }): number {
+  if (!post.results) return 0;
+  return Object.values(post.results).reduce((sum, r) => sum + (r?.views || 0), 0);
+}
 
 export default async function HomePage() {
   const [home, accounts, settings] = await Promise.all([
@@ -26,206 +51,178 @@ export default async function HomePage() {
   }
   const creditsLow = settings.aiCreditsPercent <= 20;
 
+  const needsYou: NeedsYouItem[] = [];
+  if (home.waitingCount > 0) {
+    needsYou.push({
+      id: "waiting",
+      tone: "warning",
+      icon: "clock",
+      title: `${home.waitingCount} post${home.waitingCount === 1 ? "" : "s"} waiting for your approval`,
+      detail: "Review the text, hashtags and image before they go out.",
+      action: { label: "Review posts", href: "/approvals", variant: "primary" },
+    });
+  }
+  for (const a of reconnectAccounts) {
+    needsYou.push({
+      id: `reconnect-${a.platform}`,
+      tone: "error",
+      icon: "unlink",
+      title: `${PLATFORMS[a.platform].label} login expired`,
+      detail: `${blockedCount} post${blockedCount === 1 ? "" : "s"} blocked until you reconnect.`,
+      action: { label: `Reconnect ${PLATFORMS[a.platform].label}`, href: "/settings", variant: "secondary" },
+    });
+  }
+  if (home.failedCount > 0) {
+    needsYou.push({
+      id: "failed",
+      tone: "error",
+      icon: "alert",
+      title: `${home.failedCount} post${home.failedCount === 1 ? "" : "s"} failed to publish`,
+      detail: "Check Approvals for what went wrong.",
+      action: { label: "Go to Approvals", href: "/approvals", variant: "secondary" },
+    });
+  }
+  if (creditsLow) {
+    needsYou.push({
+      id: "credits",
+      tone: "warning",
+      icon: "alert",
+      title: "AI credits running low",
+      detail: `About ${settings.aiCreditsPostsLeft} posts left this month.`,
+      action: { label: "Top up", href: "/settings", variant: "secondary" },
+    });
+  }
+
   return (
-    <div>
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">Home</h1>
-          <p className="mt-1 text-sm text-neutral-500">{todayLong()}</p>
-        </div>
-        <Link
-          href="/new-post"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          New post
-        </Link>
-      </div>
+    <div className="flex flex-col gap-7 max-w-[1120px] mx-auto">
+      <PageHeader
+        eyebrow={todayLong()}
+        title="Home"
+        subtitle={needsYou.length === 0 ? "Everything is on track." : "Here's what needs your attention."}
+        actions={
+          <Button variant="primary" to="/new-post">
+            <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
+            New post
+          </Button>
+        }
+      />
 
-      <div className="mt-6 grid grid-cols-4 gap-4">
-        <StatCard value={home.publishedThisMonth} label="Published this month" />
-        <StatCard value={home.waitingCount} label="Waiting for you" tone="amber" />
-        <StatCard value={home.failedCount} label="Failed" tone="red" />
-        <StatCard value={home.scheduledCount} label="Scheduled" />
-      </div>
-
-      <div className="mt-6 flex gap-6">
-        <div className="flex-1 space-y-6">
-          <Card title="Coming up">
-            {home.comingUp.length === 0 ? (
-              <EmptyRow text="Nothing scheduled yet." />
-            ) : (
-              home.comingUp.map((post) => (
-                <Row key={post.id}>
-                  <div className="flex items-start gap-2.5">
-                    <span className="mt-1.5">
-                      <StatusDot color={statusDotColor(post.status)} />
-                    </span>
-                    <div>
-                      <Link
-                        href={`/post/${post.id}`}
-                        className="text-sm font-medium text-neutral-900 hover:underline"
-                      >
-                        {post.topic}
-                      </Link>
-                      <p className="mt-0.5 text-sm text-neutral-500">
-                        {post.platforms.map((p) => PLATFORMS[p].label).join(", ")} · {formatDayMonth(post.date)}, {post.time}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-sm text-neutral-400">
-                    {relativeDays(post.date, post.time)}
-                  </span>
-                </Row>
-              ))
-            )}
-          </Card>
-
-          <Card title="Recent">
-            {home.recent.length === 0 ? (
-              <EmptyRow text="Nothing published yet." />
-            ) : (
-              home.recent.map((post) => {
-                const failed = post.status === "failed";
-                return (
-                  <Row key={post.id}>
-                    <div className="flex items-start gap-2.5">
-                      <span className="mt-1.5">
-                        <StatusDot color={statusDotColor(post.status)} />
-                      </span>
-                      <div>
-                        <Link
-                          href={`/post/${post.id}`}
-                          className="text-sm font-medium text-neutral-900 hover:underline"
-                        >
-                          {post.topic}
-                        </Link>
-                        <p className={`mt-0.5 text-sm ${failed ? "text-red-600" : "text-neutral-500"}`}>
-                          {failed
-                            ? `Failed · tried ${post.attempts} of ${post.maxAttempts}`
-                            : `Published ${formatDayMonth(post.date)}`}
-                        </p>
-                      </div>
-                    </div>
-                    {failed ? (
-                      <RotateCw size={16} className="mt-1 shrink-0 text-neutral-400" />
-                    ) : (
-                      <span className="shrink-0 text-sm text-neutral-500">
-                        {sumViews(post)} views
-                      </span>
-                    )}
-                  </Row>
-                );
-              })
-            )}
-          </Card>
-        </div>
-
-        <div className="w-72 shrink-0 space-y-3">
-          {reconnectAccounts.map((a) => (
-            <AlertCard
-              key={a.id}
-              tone="red"
-              icon={Clock}
-              title={`${PLATFORMS[a.platform].label} login expired`}
-              detail={`${blockedCount} post${blockedCount === 1 ? "" : "s"} blocked`}
-            />
-          ))}
-          {creditsLow && (
-            <AlertCard
-              tone="amber"
-              icon={AlertTriangle}
-              title="AI credits low"
-              detail={`About ${settings.aiCreditsPostsLeft} posts left`}
-            />
-          )}
-
-          <Card title="Accounts">
-            {accounts.map((a) => (
-              <Row key={a.id}>
-                <div className="flex items-center gap-2.5">
-                  <PlatformIcon platform={a.platform} size={20} />
-                  <span className="text-sm text-neutral-800">{a.label}</span>
+      {needsYou.length > 0 && (
+        <Card className="px-6 py-1.5">
+          <CardHeader
+            title="Needs you"
+            className="pt-4 pb-2.5"
+            aside={<Chip tone="warning">{needsYou.length} things</Chip>}
+          />
+          {needsYou.map((item) => {
+            const Icon = needsYouIcons[item.icon];
+            return (
+              <div key={item.id} className={`${row} gap-4`}>
+                <span className={`w-[42px] h-[42px] rounded-xl flex items-center justify-center flex-none ${needsYouBox[item.tone]}`}>
+                  <Icon size={22} strokeWidth={2} aria-hidden="true" />
+                </span>
+                <div className="flex-[1_1_300px] min-w-0">
+                  <div className="font-bold text-base">{item.title}</div>
+                  <div className="text-muted text-sm">{item.detail}</div>
                 </div>
-                {a.status === "connected" && <Pill tone="green">Connected</Pill>}
-                {a.status === "reconnect" && <Pill tone="amber">Reconnect</Pill>}
-                {a.status === "not_connected" && <Pill tone="gray">Add</Pill>}
-              </Row>
-            ))}
-          </Card>
-        </div>
+                <Button variant={item.action.variant} to={item.action.href}>
+                  {item.action.label}
+                </Button>
+              </div>
+            );
+          })}
+        </Card>
+      )}
+
+      <div className="grid gap-6 grid-cols-[repeat(auto-fit,minmax(min(360px,100%),1fr))]">
+        <Card className="px-6 pt-[22px] pb-2">
+          <CardHeader title="Coming up" className="pb-3" aside={<Link href="/calendar" className="font-bold text-sm">Open calendar</Link>} />
+          {home.comingUp.length === 0 ? (
+            <p className="py-4 m-0 text-muted">Nothing scheduled yet.</p>
+          ) : (
+            home.comingUp.map((post) => (
+              <Link
+                key={post.id}
+                href={postLink(post)}
+                className={`${row} gap-3.5 text-ink no-underline hover:text-ink hover:bg-subtle`}
+              >
+                <div className="w-[54px] text-center border border-border rounded-[10px] py-[5px] flex-none bg-subtle">
+                  <div className="eyebrow text-[10.5px]">{shortDay(`${post.date}T00:00`)}</div>
+                  <div className="heading text-[21px] leading-[1.1]">{new Date(`${post.date}T00:00`).getDate()}</div>
+                </div>
+                <div className="flex-[1_1_180px] min-w-0">
+                  <div className="font-bold">{post.topic}</div>
+                  <div className="text-muted text-[13.5px] flex items-center gap-1.5">
+                    {post.time}
+                    {post.platforms.map((p) => (
+                      <PlatformBadge key={p} platform={p} size="sm" />
+                    ))}
+                  </div>
+                </div>
+                <Chip tone="info">Scheduled</Chip>
+              </Link>
+            ))
+          )}
+        </Card>
+
+        <Card className="px-6 pt-[22px] pb-6 flex flex-col gap-[18px]">
+          <CardHeader title="Last 30 days" aside={<Link href="/strategy/insights" className="font-bold text-sm">See insights</Link>} />
+          <div className="grid grid-cols-2 gap-3">
+            <StatCard label="Published this month" value={String(home.publishedThisMonth)} note="" />
+            <StatCard
+              label="Waiting for you"
+              value={String(home.waitingCount)}
+              note={home.waitingCount > 0 ? "Needs review" : "All clear"}
+              noteTone={home.waitingCount > 0 ? "warning" : "muted"}
+            />
+            <StatCard
+              label="Failed"
+              value={String(home.failedCount)}
+              note={home.failedCount > 0 ? "Needs a fix" : "None"}
+              noteTone={home.failedCount > 0 ? "error" : "muted"}
+            />
+            <StatCard label="Scheduled" value={String(home.scheduledCount)} note="" />
+          </div>
+          <div className="flex gap-3 items-start bg-primary-light rounded-xl px-4 py-3.5">
+            <Lightbulb size={20} strokeWidth={2} className="text-primary flex-none mt-0.5" aria-hidden="true" />
+            <div className="text-sm text-primary-hover">
+              Want the full breakdown of what&rsquo;s working?{" "}
+              <Link href="/strategy/insights" className="font-bold">
+                See insights
+              </Link>
+            </div>
+          </div>
+        </Card>
       </div>
-    </div>
-  );
-}
 
-function sumViews(post: { results?: Partial<Record<string, { views?: number }>> }): number {
-  if (!post.results) return 0;
-  return Object.values(post.results).reduce((sum, r) => sum + (r?.views || 0), 0);
-}
-
-function StatCard({
-  value,
-  label,
-  tone,
-}: {
-  value: number;
-  label: string;
-  tone?: "amber" | "red";
-}) {
-  const box =
-    tone === "amber"
-      ? "border-amber-100 bg-amber-50"
-      : tone === "red"
-        ? "border-red-100 bg-red-50"
-        : "border-black/5 bg-white";
-  const num =
-    tone === "amber" ? "text-amber-700" : tone === "red" ? "text-red-600" : "text-neutral-900";
-
-  return (
-    <div className={`rounded-xl border p-5 ${box}`}>
-      <div className={`text-3xl font-semibold ${num}`}>{value}</div>
-      <div className="mt-1 text-sm text-neutral-500">{label}</div>
-    </div>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-black/5 bg-white">
-      <div className="px-5 pt-4 pb-2 text-sm font-medium text-neutral-500">{title}</div>
-      <div className="divide-y divide-black/5">{children}</div>
-    </div>
-  );
-}
-
-function Row({ children }: { children: React.ReactNode }) {
-  return <div className="flex items-start justify-between gap-4 px-5 py-3.5">{children}</div>;
-}
-
-function EmptyRow({ text }: { text: string }) {
-  return <div className="px-5 py-6 text-sm text-neutral-400">{text}</div>;
-}
-
-function AlertCard({
-  tone,
-  icon: Icon,
-  title,
-  detail,
-}: {
-  tone: "red" | "amber";
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  title: string;
-  detail: string;
-}) {
-  const box = tone === "red" ? "border-red-100 bg-red-50" : "border-amber-100 bg-amber-50";
-  const text = tone === "red" ? "text-red-700" : "text-amber-700";
-  return (
-    <div className={`flex items-start gap-2.5 rounded-xl border p-4 ${box}`}>
-      <Icon size={16} className={`mt-0.5 shrink-0 ${text}`} />
-      <div>
-        <p className={`text-sm font-medium ${text}`}>{title}</p>
-        <p className={`mt-0.5 text-sm ${text}`}>{detail}</p>
-      </div>
+      <Card className="px-6 pt-[22px] pb-2">
+        <CardHeader title="Recent" className="pb-2.5" aside={<Link href="/approvals" className="font-bold text-sm">All posts</Link>} />
+        {home.recent.length === 0 ? (
+          <p className="py-4 m-0 text-muted">Nothing published yet.</p>
+        ) : (
+          home.recent.map((post) => {
+            const failed = post.status === "failed";
+            return (
+              <Link
+                key={post.id}
+                href={failed ? "/approvals" : `/post/${post.id}`}
+                className="flex flex-wrap items-center gap-3.5 py-3.5 border-t border-divider no-underline text-ink hover:text-ink hover:bg-subtle"
+              >
+                <PlatformBadge platform={post.platforms[0]} />
+                <div className="flex-[1_1_220px] min-w-0">
+                  <div className="font-bold">{post.topic}</div>
+                  <div className="text-muted text-[13.5px]">
+                    {failed
+                      ? `Failed · tried ${post.attempts} of ${post.maxAttempts}`
+                      : `Published ${formatDayMonth(post.date)} · ${sumViews(post)} views`}
+                  </div>
+                </div>
+                <Chip tone={failed ? "error" : "success"}>{failed ? "Failed" : "Published"}</Chip>
+              </Link>
+            );
+          })
+        )}
+      </Card>
     </div>
   );
 }

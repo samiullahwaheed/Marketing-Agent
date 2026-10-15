@@ -1,25 +1,31 @@
-import type { PillTone } from "@/lib/status";
+"use client";
 
-const TONES: Record<PillTone, string> = {
-  green: "bg-emerald-50 text-emerald-700",
-  amber: "bg-amber-50 text-amber-700",
-  red: "bg-red-50 text-red-700",
-  blue: "bg-blue-50 text-blue-700",
-  gray: "bg-neutral-100 text-neutral-600",
-};
+import type { ReactNode } from "react";
 
-export default function Pill({
-  tone,
+/** Rounded toggle button. Dark when on. */
+export function Pill({
+  on,
+  onClick,
   children,
+  className = "",
+  dashed = false,
 }: {
-  tone: PillTone;
-  children: React.ReactNode;
+  on?: boolean;
+  onClick?: () => void;
+  children: ReactNode;
+  className?: string;
+  dashed?: boolean;
 }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${TONES[tone]}`}
+    <button
+      type="button"
+      aria-pressed={on === undefined ? undefined : on}
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 min-h-10 px-3.5 rounded-full border text-sm font-semibold cursor-pointer ${
+        dashed ? "border-dashed" : ""
+      } ${on ? "bg-ink border-ink text-white" : "bg-card border-control text-ink hover:bg-page"} ${className}`}
     >
       {children}
-    </span>
+    </button>
   );
 }

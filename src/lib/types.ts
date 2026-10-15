@@ -16,6 +16,7 @@ export interface PlatformContent {
   text: string;
   hashtags: string[];
   suggestedHashtags?: string[];
+  keywords?: string[];
 }
 
 export interface PlatformResult {
@@ -45,6 +46,8 @@ export interface PostDoc {
   lastError?: string;
   lastAttemptAt?: string;
   results?: Partial<Record<Platform, PlatformResult>>;
+  rejectionReason?: string;
+  rejectionNote?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -80,4 +83,5 @@ export interface SettingsDoc {
   aiCreditsPercent: number;
   aiCreditsPostsLeft: number;
   brandVoice: BrandVoiceDoc;
+  bannedWords?: string[];
 }

@@ -3,6 +3,10 @@ import type { Platform } from "./types";
 export interface PlatformMeta {
   key: Platform;
   label: string;
+  /** Short mark used in badges, e.g. "in", "X", "IG", "f". */
+  short: string;
+  /** Tailwind background colour class for badges/tiles. */
+  bg: string;
   charLimit: number;
   maxHashtags: number;
   cutoffChars?: number;
@@ -18,6 +22,8 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
   linkedin: {
     key: "linkedin",
     label: "LinkedIn",
+    short: "in",
+    bg: "bg-linkedin",
     charLimit: 3000,
     maxHashtags: 5,
     cutoffChars: 210,
@@ -28,6 +34,8 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
   x: {
     key: "x",
     label: "X",
+    short: "X",
+    bg: "bg-x",
     charLimit: 280,
     maxHashtags: 2,
     threadNote: "Over 280 becomes a thread",
@@ -37,6 +45,8 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
   instagram: {
     key: "instagram",
     label: "Instagram",
+    short: "IG",
+    bg: "bg-instagram",
     charLimit: 2200,
     maxHashtags: 5,
     cutoffChars: 125,
@@ -47,6 +57,8 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
   facebook: {
     key: "facebook",
     label: "Facebook",
+    short: "f",
+    bg: "bg-facebook",
     charLimit: 63206,
     maxHashtags: 10,
     imageWidth: 1200,

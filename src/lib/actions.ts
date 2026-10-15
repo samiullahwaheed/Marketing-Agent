@@ -89,8 +89,8 @@ export async function createPostAction(formData: FormData): Promise<void> {
   }
 
   revalidatePath("/");
-  revalidatePath("/activity");
-  redirect("/activity");
+  revalidatePath("/approvals");
+  redirect("/approvals");
 }
 
 export async function approvePostAction(id: string): Promise<void> {
@@ -105,15 +105,33 @@ export async function approvePostAction(id: string): Promise<void> {
 
   await setPostFields(id, { status: "scheduled", results });
   revalidatePath("/");
-  revalidatePath("/activity");
+  revalidatePath("/approvals");
   revalidatePath(`/post/${id}`);
 }
 
-export async function rejectPostAction(id: string): Promise<void> {
-  await setPostFields(id, { status: "rejected" });
+export async function rejectPostAction(
+  id: string,
+  input?: { reason?: string; note?: string; banWord?: string }
+): Promise<void> {
+  await setPostFields(id, {
+    status: "rejected",
+    rejectionReason: input?.reason,
+    rejectionNote: input?.note,
+  });
+
+  if (input?.banWord) {
+    const settings = await settingsCollection();
+    await settings.updateOne(
+      { _id: "global" },
+      { $addToSet: { bannedWords: input.banWord } },
+      { upsert: true }
+    );
+  }
+
   revalidatePath("/");
-  revalidatePath("/activity");
+  revalidatePath("/approvals");
   revalidatePath(`/post/${id}`);
+  revalidatePath(`/post/${id}/review`);
 }
 
 export async function requestRewriteAction(id: string): Promise<void> {
@@ -140,7 +158,7 @@ export async function requestRewriteAction(id: string): Promise<void> {
     });
   }
 
-  revalidatePath("/activity");
+  revalidatePath("/approvals");
   revalidatePath(`/post/${id}`);
 }
 
@@ -163,15 +181,15 @@ export async function retryPostAction(id: string): Promise<void> {
   );
 
   revalidatePath("/");
-  revalidatePath("/activity");
+  revalidatePath("/approvals");
   revalidatePath(`/post/${id}`);
 }
 
 export async function giveUpOnPostAction(id: string): Promise<void> {
   await setPostFields(id, { status: "rejected" });
   revalidatePath("/");
-  revalidatePath("/activity");
-  redirect("/activity");
+  revalidatePath("/approvals");
+  redirect("/approvals");
 }
 
 export async function updatePlatformContentAction(
@@ -185,6 +203,14 @@ export async function updatePlatformContentAction(
     { $set: { [`content.${platform}`]: content, updatedAt: new Date() } }
   );
   revalidatePath(`/post/${id}`);
+}
+
+export async function reschedulePostAction(id: string, date: string): Promise<void> {
+  await setPostFields(id, { date });
+  revalidatePath("/calendar");
+  revalidatePath("/approvals");
+  revalidatePath(`/post/${id}`);
+  revalidatePath(`/post/${id}/review`);
 }
 
 export async function updatePostImageAction(id: string, formData: FormData): Promise<void> {
@@ -207,7 +233,7 @@ export async function reconnectAccountAction(platform: Platform): Promise<void> 
     { upsert: true }
   );
   revalidatePath("/");
-  revalidatePath("/activity");
+  revalidatePath("/approvals");
   revalidatePath("/new-post");
 }
 
@@ -223,5 +249,23 @@ export async function saveBrandVoiceAction(formData: FormData): Promise<void> {
     { $set: { brandVoice: { tone, keywords, sampleText, doNots } } },
     { upsert: true }
   );
-  revalidatePath("/brand-voice");
+  revalidatePath("/settings");
+}
+
+export async function addBannedWordAction(word: string): Promise<void> {
+  const trimmed = word.trim().toLowerCase();
+  if (!trimmed) return;
+  const col = await settingsCollection();
+  await col.updateOne(
+    { _id: "global" },
+    { $addToSet: { bannedWords: trimmed } },
+    { upsert: true }
+  );
+  revalidatePath("/settings");
+}
+
+export async function removeBannedWordAction(word: string): Promise<void> {
+  const col = await settingsCollection();
+  await col.updateOne({ _id: "global" }, { $pull: { bannedWords: word } });
+  revalidatePath("/settings");
 }

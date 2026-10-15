@@ -1,78 +1,130 @@
 "use client";
 
+import {
+  Calendar,
+  ChartColumn,
+  House,
+  Inbox,
+  LogOut,
+  Plus,
+  SlidersHorizontal,
+  Target,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, PenLine, Bell, Megaphone } from "lucide-react";
 import { logoutAction } from "@/app/login/actions";
+import { Logo } from "./Logo";
 
-const NAV = [
-  { href: "/", label: "Home", icon: LayoutGrid },
-  { href: "/new-post", label: "New post", icon: PenLine },
-  { href: "/activity", label: "Activity", icon: Bell },
-  { href: "/brand-voice", label: "Brand voice", icon: Megaphone },
-];
-
-export default function Sidebar({
-  hasActivityAlert,
-  aiCreditsPercent,
+function NavItem({
+  href,
+  icon: Icon,
+  label,
+  badge,
 }: {
-  hasActivityAlert: boolean;
-  aiCreditsPercent: number;
+  href: string;
+  icon: LucideIcon;
+  label: string;
+  badge?: number;
 }) {
   const pathname = usePathname();
+  const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+  return (
+    <Link
+      href={href}
+      className={`flex items-center gap-3 min-h-11 px-3 rounded-[10px] no-underline text-[15px] ${
+        active
+          ? "bg-primary-light text-primary-hover font-bold hover:text-primary-hover"
+          : "text-nav font-medium hover:bg-page hover:text-ink"
+      }`}
+    >
+      <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
+      <span>{label}</span>
+      {!!badge && (
+        <span className="ml-auto bg-marigold text-ink text-xs font-bold rounded-full px-2 py-px">
+          {badge}
+          <span className="sr-only"> waiting</span>
+        </span>
+      )}
+    </Link>
+  );
+}
+
+export default function Sidebar({
+  showLogo = true,
+  hasActivityAlert,
+  aiCreditsPercent,
+  aiCreditsPostsLeft,
+}: {
+  showLogo?: boolean;
+  hasActivityAlert: number;
+  aiCreditsPercent: number;
+  aiCreditsPostsLeft: number;
+}) {
+  const low = aiCreditsPercent <= 20;
 
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-black/5 bg-[#faf9f7] px-3 py-5">
-      <div className="flex items-center gap-2 px-2 pb-6">
-        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 text-xs font-semibold text-white">
-          M
-        </div>
-        <span className="text-[15px] font-medium text-neutral-800">Marketing agent</span>
+    <nav aria-label="Main" className="flex flex-col gap-[22px] px-4 pt-6 pb-7 bg-card text-ink">
+      {showLogo && <Logo />}
+
+      <Link
+        href="/new-post"
+        className="flex items-center justify-center gap-2 min-h-[46px] rounded-[10px] bg-primary text-white no-underline font-bold text-[15px] hover:bg-primary-hover hover:text-white"
+      >
+        <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
+        New post
+      </Link>
+
+      <div className="flex flex-col gap-0.5">
+        <NavItem href="/" icon={House} label="Home" />
+        <NavItem href="/calendar" icon={Calendar} label="Calendar" />
+        <NavItem href="/approvals" icon={Inbox} label="Approvals" badge={hasActivityAlert} />
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5">
-        {NAV.map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[14px] transition-colors ${
-                active
-                  ? "bg-blue-50 font-medium text-blue-700"
-                  : "text-neutral-600 hover:bg-black/4"
-              }`}
-            >
-              <Icon size={16} strokeWidth={2} className={active ? "text-blue-600" : "text-neutral-500"} />
-              <span>{label}</span>
-              {label === "Activity" && hasActivityAlert && (
-                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-red-500" />
-              )}
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="flex flex-col gap-0.5">
+        <p className="mb-1.5 mt-0 px-3 text-[11.5px] font-bold tracking-[.08em] uppercase text-muted">Strategy</p>
+        <NavItem href="/strategy/insights" icon={ChartColumn} label="Insights" />
+        <NavItem href="/strategy/plan" icon={Target} label="Plan" />
+        <NavItem href="/strategy/audiences" icon={Users} label="Audiences" />
+      </div>
 
-      <div className="px-2 pt-4">
-        <div className="mb-1.5 flex items-center justify-between text-xs text-neutral-500">
-          <span>AI credits</span>
-          <span className={aiCreditsPercent <= 20 ? "font-medium text-amber-600" : ""}>
-            {aiCreditsPercent}%
-          </span>
+      <div className="flex flex-col gap-0.5">
+        <NavItem href="/settings" icon={SlidersHorizontal} label="Settings" />
+      </div>
+
+      <div className="border border-border rounded-xl p-3.5 flex flex-col gap-2.5 bg-subtle">
+        <div className="flex justify-between items-baseline gap-2">
+          <span className="font-bold text-sm">AI credits</span>
+          {low && <span className="text-[13px] text-warning font-semibold">Running low</span>}
         </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/10">
-          <div
-            className={`h-full rounded-full ${aiCreditsPercent <= 20 ? "bg-amber-500" : "bg-blue-600"}`}
-            style={{ width: `${Math.max(0, Math.min(100, aiCreditsPercent))}%` }}
-          />
+        <div
+          className="h-1.5 rounded-full bg-divider overflow-hidden"
+          role="progressbar"
+          aria-label="AI credits left"
+          aria-valuenow={aiCreditsPercent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          <div className="h-full bg-marigold" style={{ width: `${Math.max(0, Math.min(100, aiCreditsPercent))}%` }} />
+        </div>
+        <div className="flex justify-between text-[13px] text-muted">
+          <span>About {aiCreditsPostsLeft} posts left</span>
+          <Link href="/settings" className="font-bold">
+            Top up
+          </Link>
         </div>
       </div>
 
-      <form action={logoutAction} className="px-2 pt-3">
-        <button type="submit" className="text-[11px] text-neutral-400 hover:text-neutral-600">
+      <form action={logoutAction}>
+        <button
+          type="submit"
+          className="flex items-center gap-2.5 px-2 min-h-9 text-[13px] text-muted hover:text-ink border-0 bg-transparent cursor-pointer w-full"
+        >
+          <LogOut size={16} strokeWidth={1.8} aria-hidden="true" />
           Sign out
         </button>
       </form>
-    </aside>
+    </nav>
   );
 }

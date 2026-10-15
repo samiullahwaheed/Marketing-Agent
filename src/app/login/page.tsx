@@ -1,4 +1,38 @@
-import { loginAction } from "./actions";
+import { AuthLayout } from "@/components/AuthLayout";
+import LoginForm from "./LoginForm";
+
+function Hero() {
+  return (
+    <>
+      <div className="max-w-[540px] flex flex-col gap-[18px]">
+        <h1 className="heading text-white font-extrabold leading-[1.04] text-[clamp(38px,4.4vw,58px)]">
+          Your posts, written for you. <span className="text-marigold-soft">Approved by you.</span>
+        </h1>
+        <p className="m-0 text-lg text-[#D7E6DD] max-w-[460px]">
+          The agent drafts, checks and schedules every post. Nothing goes live until you say so.
+        </p>
+      </div>
+      <div aria-hidden="true" className="relative max-w-[460px] pt-2 pb-6">
+        <div className="absolute -right-2 -top-3.5 rotate-[4deg] bg-marigold-soft text-[#3B2A08] rounded-xl px-4 py-3 text-sm font-semibold max-w-[210px] shadow-[0_10px_24px_rgba(0,0,0,.18)]">
+          Heads up: &ldquo;11 hours a week&rdquo; needs a source before this goes out.
+        </div>
+        <div className="bg-card text-ink rounded-2xl p-5 -rotate-2 shadow-[0_20px_40px_rgba(0,0,0,.22)] flex flex-col gap-3 max-w-[380px]">
+          <span className="self-start bg-warning-bg text-warning text-xs font-bold rounded-full px-2.5 py-[3px]">
+            Waiting for you
+          </span>
+          <div className="font-heading font-bold text-[19px]">Manual invoicing costs</div>
+          <div className="text-sm text-nav">
+            A client called me last month. His accountant quit. Turns out she was spending 11 hours a week on invoices…
+          </div>
+          <div className="flex gap-2">
+            <span className="bg-primary text-white rounded-lg px-3.5 py-2 text-[13px] font-bold">Approve</span>
+            <span className="border border-control rounded-lg px-3.5 py-2 text-[13px] font-semibold">Rewrite</span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
 
 export default async function LoginPage({
   searchParams,
@@ -8,39 +42,14 @@ export default async function LoginPage({
   const { error, next } = await searchParams;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f7f6f3] px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-black/5 bg-white p-8 shadow-sm">
-        <div className="mb-6 flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-sm font-semibold text-white">
-            M
-          </div>
-          <span className="text-sm font-medium text-neutral-800">Marketing agent</span>
+    <AuthLayout hero={<Hero />} heroBasis="480px" formBasis="440px">
+      <div className="w-full max-w-[420px] flex flex-col gap-6">
+        <div className="flex flex-col gap-1.5">
+          <h2 className="heading text-4xl">Welcome back</h2>
+          <p className="m-0 text-muted text-base">Enter the dashboard password to continue.</p>
         </div>
-
-        <h1 className="text-xl font-semibold text-neutral-900">Sign in</h1>
-        <p className="mt-1 text-sm text-neutral-500">Enter the dashboard password to continue.</p>
-
-        <form action={loginAction} className="mt-6 flex flex-col gap-3">
-          <input type="hidden" name="next" value={next || "/"} />
-          <input
-            type="password"
-            name="password"
-            autoFocus
-            required
-            placeholder="Password"
-            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-neutral-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          />
-          {error && (
-            <p className="text-sm text-red-600">That password isn&apos;t right. Try again.</p>
-          )}
-          <button
-            type="submit"
-            className="mt-1 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Sign in
-          </button>
-        </form>
+        <LoginForm error={!!error} next={next || "/"} />
       </div>
-    </div>
+    </AuthLayout>
   );
 }

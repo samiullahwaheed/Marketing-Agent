@@ -141,23 +141,18 @@ export async function getHomeData(): Promise<HomeData> {
   };
 }
 
+export async function getCalendarPosts(): Promise<Post[]> {
+  const col = await postsCollection();
+  const docs = await col.find().sort({ date: 1, time: 1 }).toArray();
+  return docs.map(serializePost);
+}
+
 export interface ActivityData {
-  waiting: Post[];
-  others: Post[];
+  posts: Post[];
 }
 
 export async function getActivityData(): Promise<ActivityData> {
   const col = await postsCollection();
-  const [waitingDocs, otherDocs] = await Promise.all([
-    col.find({ status: "waiting_approval" }).sort({ createdAt: -1 }).toArray(),
-    col
-      .find({ status: { $ne: "waiting_approval" } })
-      .sort({ updatedAt: -1 })
-      .limit(20)
-      .toArray(),
-  ]);
-  return {
-    waiting: waitingDocs.map(serializePost),
-    others: otherDocs.map(serializePost),
-  };
+  const docs = await col.find().sort({ updatedAt: -1 }).limit(200).toArray();
+  return { posts: docs.map(serializePost) };
 }
