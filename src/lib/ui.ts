@@ -1,4 +1,6 @@
-/** Shared class strings for form controls. */
+/** Shared class strings for form controls.........
+ * kllk
+ */
 export const inputClass =
   "w-full min-h-[46px] px-3.5 py-[11px] border border-control rounded-[10px] text-[15px] font-normal leading-[1.45] text-ink bg-white/70 backdrop-blur-sm font-sans focus:outline-2 focus:outline-primary focus:outline-offset-1";
 
