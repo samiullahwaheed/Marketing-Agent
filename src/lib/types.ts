@@ -34,10 +34,14 @@ export interface PostDoc {
   topic: string;
   date: string;
   time: string;
+  scheduledAt?: string;
   platforms: Platform[];
   imageMode: "ai" | "upload";
   imagePrompt?: string;
   imageUrl?: string;
+  audience?: string;
+  goal?: string;
+  language?: string;
   content: Partial<Record<Platform, PlatformContent>>;
   warnings?: string[];
   status: PostStatus;

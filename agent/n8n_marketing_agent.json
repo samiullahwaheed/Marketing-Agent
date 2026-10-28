@@ -1,0 +1,837 @@
+{
+  "name": "Social Media Agent - Complete Dashboard Flow (fixed)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "social-post-create",
+        "responseMode": "onReceived",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "cf129409-9fe9-41c0-b041-9f455bbffa7b",
+      "name": "Create Post Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE-AFTER-IMPORT",
+          "name": "Dashboard API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$json.body ?? $json;\nconst platforms=['linkedin','x','instagram','facebook'];\nif(!b.postId || !b.topic || !Array.isArray(b.platforms) || !b.platforms.length || !b.callbackUrl)\n  throw new Error('postId, topic, platforms and callbackUrl are required');\nif(b.platforms.some(p=>!platforms.includes(p))) throw new Error('Unsupported platform in request');\nreturn [{json:{\n postId:String(b.postId), jobId:String(b.postId), topic:b.topic, date:b.date, time:b.time,\n scheduledAt:b.scheduledAt ?? null, platforms:b.platforms,\n uploadedImageUrl:b.imageUrl ?? null, imageMode:b.imageMode ?? 'ai',\n imagePrompt:b.imagePrompt ?? '', audience:b.audience ?? '', goal:b.goal ?? '', language:b.language ?? '',\n brandVoice:b.brandVoice ?? {}, rewrite:Boolean(b.rewrite), currentContent:b.currentContent ?? null,\n callbackUrl:b.callbackUrl, status:'generating'\n}}];"
+      },
+      "id": "85c3beb5-816c-4828-85aa-e741df3623e4",
+      "name": "Normalize Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "platforms",
+        "options": {
+          "destinationFieldName": "platform"
+        },
+        "include": "allOtherFields"
+      },
+      "id": "482f71a2-f75f-48d8-83bb-d5175de9115f",
+      "name": "Split Platforms",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rules={\nlinkedin:{maxCharacters:3000,style:'professional'},\nx:{maxCharacters:280,style:'concise'},\ninstagram:{maxCharacters:2200,style:'visual and engaging'},\nfacebook:{maxCharacters:63206,style:'conversational'}\n};\nreturn [{json:{...$json,platformRules:rules[$json.platform]??{style:'social'}}}];"
+      },
+      "id": "85d34fe3-351a-4b4b-954d-7e0d41c80fb5",
+      "name": "Platform Rules",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE-WITH-YOUR-CONTENT-AGENT-ENDPOINT",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {postId:$json.postId,jobId:$json.jobId,topic:$json.topic,platform:$json.platform,rules:$json.platformRules,brandVoice:$json.brandVoice,audience:$json.audience,goal:$json.goal,language:$json.language,rewrite:$json.rewrite,currentContent:$json.currentContent} }}",
+        "options": {}
+      },
+      "id": "ebd235f2-599d-4560-aef9-ad7e7fa2475a",
+      "name": "Generate Content - Existing Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const generated=$input.all();\nconst bases=$('Platform Rules').all();\nconst content={};\nconst warnings=[];\nfor(let i=0;i<generated.length;i++){\n const base=bases[i]?.json;\n const result=generated[i].json;\n const raw=result.content ?? result;\n const text=typeof raw==='string' ? raw : raw.text ?? raw.output ?? raw.post ?? result.text ?? result.output ?? result.post ?? result.message ?? '';\n if(!text) throw new Error('Content agent returned no text for '+base.platform);\n content[base.platform]={text:String(text),hashtags:Array.isArray(raw.hashtags)?raw.hashtags:(Array.isArray(result.hashtags)?result.hashtags:[]),suggestedHashtags:Array.isArray(raw.suggestedHashtags)?raw.suggestedHashtags:(Array.isArray(result.suggestedHashtags)?result.suggestedHashtags:[])};\n const itemWarnings=result.warnings ?? result.flags ?? [];\n warnings.push(...(Array.isArray(itemWarnings)?itemWarnings:[String(itemWarnings)]));\n}\nconst base=bases[0].json;\nreturn [{json:{...base,platform:undefined,platforms:bases.map(item=>item.json.platform),content,warnings,hasUserImage:Boolean(base.uploadedImageUrl)}}];"
+      },
+      "id": "0cec4bcc-2b7f-4cc4-95b7-1d795fd1f0ef",
+      "name": "Aggregate Generated Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "04dd4cfb-1725-4da9-93d2-1d64677c04ed",
+              "leftValue": "={{ $json.hasUserImage }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "db1273ec-feab-4d87-b93f-4f981995a8cf",
+      "name": "User Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{json:{...$json,imageUrl:$json.uploadedImageUrl,imageSource:'user'}}];"
+      },
+      "id": "ef74d468-94f7-43e3-9b0b-ff0695b20779",
+      "name": "Use User Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE-WITH-YOUR-IMAGE-AGENT-ENDPOINT",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {jobId:$json.jobId,topic:$json.topic,platform:$json.platform,prompt:$json.imagePrompt} }}",
+        "options": {}
+      },
+      "id": "5ecdc9db-a846-4976-9842-2cd7d6e425b3",
+      "name": "Generate Image - Existing Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE-WITH-YOUR-DRIVE-UPLOAD-ENDPOINT",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {postId:$json.postId,platforms:$json.platforms,imageSource:$json.hasUserImage ? 'user' : 'generated',imageUrl:$json.imageUrl ?? $json.url ?? $json.image ?? $json.webContentLink ?? $json.webViewLink ?? $json.uploadedImageUrl ?? null} }}",
+        "options": {}
+      },
+      "id": "903cb496-e98d-4ab3-981e-6ea6a227396a",
+      "name": "Upload Image to Drive - Adapter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callbackUrl }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {postId:$json.postId,imageUrl:$json.imageUrl,content:$json.content,warnings:$json.warnings,status:'waiting_approval'} }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "10402d18-2abc-4fbf-a40c-4c65661e99ab",
+      "name": "Return Generated Content to Dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE-AFTER-IMPORT",
+          "name": "Dashboard N8N Callback Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "social-post-publish",
+        "responseMode": "onReceived",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "0cd70fa2-e388-4f99-8d20-a92b581362bf",
+      "name": "Publish Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        520
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE-AFTER-IMPORT",
+          "name": "Dashboard API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$json.body ?? $json;\nconst platforms=['linkedin','x','instagram','facebook'];\nif(!b.postId || !b.topic || !Array.isArray(b.platforms) || !b.platforms.length || !b.callbackUrl)\n throw new Error('postId, topic, platforms and callbackUrl are required');\nif(b.platforms.some(p=>!platforms.includes(p))) throw new Error('Unsupported platform in request');\nconst scheduledAt=b.scheduledAt ?? null;\nconst platformPosts=b.platforms.map(platform=>({postId:String(b.postId),jobId:String(b.postId),platform,topic:b.topic,date:b.date,time:b.time,scheduledAt,content:b.content?.[platform] ?? {text:'',hashtags:[]},imageUrl:b.imageUrl ?? null}));\nreturn [{json:{postId:String(b.postId),jobId:String(b.postId),topic:b.topic,date:b.date,time:b.time,scheduledAt,platforms:b.platforms,platformPosts,callbackUrl:b.callbackUrl}}];"
+      },
+      "id": "4edec0de-ca39-4ffd-8654-537d4d5a8380",
+      "name": "Normalize Publish Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const all=$json.platformPosts ?? [];\nif(!Array.isArray(all) || !all.length) throw new Error('No platform posts found for publishing');\nreturn all.map(p=>({json:{...p,postId:$json.postId,jobId:$json.jobId,scheduledAt:$json.scheduledAt ?? null,callbackUrl:$json.callbackUrl}}));"
+      },
+      "id": "f1b0e51b-71b5-4302-806c-b172c29bef71",
+      "name": "Split Publish Platforms",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "34c689d4-460c-48ea-9c15-14ae1e6bf9d7",
+              "leftValue": "={{ Boolean($json.scheduledAt && new Date($json.scheduledAt).getTime() > Date.now()) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4fba81d8-4f2f-4aad-a5dd-1a79ed08a99c",
+      "name": "Schedule Required?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "specificTime",
+        "dateTime": "={{ $json.scheduledAt }}"
+      },
+      "id": "798e7221-7a7e-469a-8545-777b26967586",
+      "name": "Wait Until Scheduled",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1580,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "id": "f594b92e-8823-41ef-8cc3-3dedb8221391",
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "linkedin",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                }
+              },
+              "renameOutput": false
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "id": "1582a26d-8b41-466e-af86-e823e94d5e03",
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "x",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                }
+              },
+              "renameOutput": false
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "id": "e0454039-d1f8-4456-88a1-c6609b4a0dc2",
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "instagram",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                }
+              },
+              "renameOutput": false
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "id": "0dec7a65-e73c-4094-b4b6-8a4da417c3cd",
+                    "leftValue": "={{ $json.platform }}",
+                    "rightValue": "facebook",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                }
+              },
+              "renameOutput": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8c338b25-7257-437d-a57b-f34d47cc5002",
+      "name": "Platform Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1800,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE-WITH-YOUR-LINKEDIN-PUBLISH-ENDPOINT",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "793970df-8d36-4a8d-8855-75f1e4eaa7fc",
+      "name": "Publish LinkedIn - Adapter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2040,
+        180
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE-WITH-YOUR-X-PUBLISH-ENDPOINT",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "318ea0e1-afbe-44a6-9dca-1df7d1376fa9",
+      "name": "Publish X - Adapter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2040,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE-WITH-YOUR-INSTAGRAM-PUBLISH-ENDPOINT",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "29e18a80-d824-409e-96d5-627b7492d995",
+      "name": "Publish Instagram - Adapter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2040,
+        420
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://REPLACE-WITH-YOUR-FACEBOOK-PUBLISH-ENDPOINT",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "5a3d13f4-1746-47cd-b622-4be9be933db6",
+      "name": "Publish Facebook - Adapter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2040,
+        540
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const src=$('Platform Router').item.json;\nconst response=$json;\nconst failed=Boolean(response.error) || Number(response.statusCode ?? 200)>=400;\nconst publishedAt=failed?null:new Date().toISOString();\nconst platformResult={status:failed?'failed':'published',...(response.url ?? response.permalink ?? response.postUrl ? {url:response.url ?? response.permalink ?? response.postUrl}:{}),...(publishedAt?{publishedAt}:{}),...(failed?{error:typeof response.error==='string'?response.error:JSON.stringify(response.error ?? response)}:{})};\nreturn {json:{...src,platformResult,publishStatus:platformResult.status,publishedAt}};"
+      },
+      "id": "a0226686-8855-4830-a129-abc709118c7f",
+      "name": "Normalize Publish Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2280,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callbackUrl }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {postId:$json.postId,platformResults:{[$json.platform]:$json.platformResult}} }}",
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "35cbe57d-448d-4d97-81eb-23b154724331",
+      "name": "Return Publish Result to Dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2520,
+        360
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE-AFTER-IMPORT",
+          "name": "Dashboard N8N Callback Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const base=$('Aggregate Generated Content').first().json;\nconst up=$json;\nconst imageUrl=up.imageUrl ?? up.url ?? up.webContentLink ?? up.webViewLink ?? base.uploadedImageUrl ?? null;\nreturn {json:{...base,imageUrl,imageSource:base.hasUserImage?'user':'generated',driveFileId:up.fileId ?? up.id ?? null,status:'waiting_approval'}};"
+      },
+      "id": "0d0472cd-dcc1-42bb-8fe6-566b76c7b6be",
+      "name": "Merge Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1870,
+        160
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Create Post Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Request": {
+      "main": [
+        [
+          {
+            "node": "Split Platforms",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Platforms": {
+      "main": [
+        [
+          {
+            "node": "Platform Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Platform Rules": {
+      "main": [
+        [
+          {
+            "node": "Generate Content - Existing Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Content - Existing Agent": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Generated Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Generated Content": {
+      "main": [
+        [
+          {
+            "node": "User Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Image?": {
+      "main": [
+        [
+          {
+            "node": "Use User Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Image - Existing Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use User Image": {
+      "main": [
+        [
+          {
+            "node": "Upload Image to Drive - Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image - Existing Agent": {
+      "main": [
+        [
+          {
+            "node": "Upload Image to Drive - Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Image to Drive - Adapter": {
+      "main": [
+        [
+          {
+            "node": "Merge Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Image": {
+      "main": [
+        [
+          {
+            "node": "Return Generated Content to Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Publish Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Publish Request": {
+      "main": [
+        [
+          {
+            "node": "Split Publish Platforms",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Publish Platforms": {
+      "main": [
+        [
+          {
+            "node": "Schedule Required?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Required?": {
+      "main": [
+        [
+          {
+            "node": "Wait Until Scheduled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Platform Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Until Scheduled": {
+      "main": [
+        [
+          {
+            "node": "Platform Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Platform Router": {
+      "main": [
+        [
+          {
+            "node": "Publish LinkedIn - Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Publish X - Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Publish Instagram - Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Publish Facebook - Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish LinkedIn - Adapter": {
+      "main": [
+        [
+          {
+            "node": "Normalize Publish Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish X - Adapter": {
+      "main": [
+        [
+          {
+            "node": "Normalize Publish Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish Instagram - Adapter": {
+      "main": [
+        [
+          {
+            "node": "Normalize Publish Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish Facebook - Adapter": {
+      "main": [
+        [
+          {
+            "node": "Normalize Publish Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Publish Result": {
+      "main": [
+        [
+          {
+            "node": "Return Publish Result to Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "6f9ff981-0b06-4e0d-843b-15f8978966ca",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

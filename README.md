@@ -15,12 +15,38 @@ scheduled, or failed. Posts and account state are stored in MongoDB.
 2. **Dashboard password** — `.env.local` has `DASHBOARD_PASSWORD` (change it anytime; it's
    the only login credential, checked by `src/app/login`).
 
-3. **n8n webhook (optional)** — set `N8N_CREATE_POST_WEBHOOK_URL` to the webhook your n8n
-   workflow exposes. When set, "Create post" POSTs `{ postId, topic, date, time, platforms,
-   imageMode, imagePrompt, callbackUrl }` to it. Your n8n workflow should generate the
-   per-platform text/hashtags and image, upload the image to Google Drive, then `POST` the
-   result to `callbackUrl` (`/api/n8n/callback`) with header `x-callback-secret` set to
-   `N8N_CALLBACK_SECRET` from `.env.local`:
+3. **n8n integration** — the dashboard defaults to these n8n webhooks; set the environment
+   variables to override them:
+   ```
+   N8N_CREATE_POST_WEBHOOK_URL=https://marketing-agent1.app.n8n.cloud/webhook/social-post-create
+   N8N_PUBLISH_POST_WEBHOOK_URL=https://marketing-agent1.app.n8n.cloud/webhook/social-post-publish
+   APP_BASE_URL=https://<your-public-dashboard-host>
+   N8N_WEBHOOK_API_KEY=<shared-webhook-key>
+   N8N_CALLBACK_SECRET=<shared-callback-secret>
+   ```
+   `APP_BASE_URL` must be reachable by n8n so it can call the dashboard callback.
+   The workflow's create webhook receives `postId`, `topic`, `date`, `time`, `scheduledAt`
+   (an ISO timestamp from the user's browser), `platforms`, `imageMode`, `imageUrl`,
+   `imagePrompt`, `audience`, `goal`, `language`, `brandVoice`, and `callbackUrl`. It returns
+   generated platform content to `callbackUrl` (`/api/n8n/callback`) with header
+   `x-callback-secret` set to `N8N_CALLBACK_SECRET`. Rewrites use the same create webhook,
+   with `rewrite` and `currentContent` included.
+
+   When a post is approved or retried, the dashboard POSTs its saved post data and
+   `callbackUrl` to the publish webhook. n8n waits until `scheduledAt`, publishes each
+   platform, and reports each result to the callback route using `platformResults`.
+
+   Both webhook nodes in the exported workflow use header authentication. Configure their
+   n8n credential to accept `x-api-key` and set the same value in `N8N_WEBHOOK_API_KEY`.
+   Configure the workflow's callback HTTP credentials to send `x-callback-secret` with the
+   value of `N8N_CALLBACK_SECRET`. Keep these secrets only in environment variables and n8n
+   credentials.
+
+   The export is inactive until you import and activate it. Before activation, replace its
+   content-generation, image-generation, Drive-upload, and per-platform publish adapter
+   placeholder URLs with your real service endpoints. The supplied webhook URLs alone are
+   not credentials for those external services.
+   The callback body for generated content is:
    ```json
    {
      "postId": "...",
@@ -29,13 +55,11 @@ scheduled, or failed. Posts and account state are stored in MongoDB.
        "linkedin": { "text": "...", "hashtags": ["automation"], "suggestedHashtags": ["n8n"] },
        "x": { "text": "...", "hashtags": [] }
      },
-     "warnings": ["optional fact-check note"]
+     "warnings": ["optional fact-check note"],
+     "status": "waiting_approval"
    }
    ```
-   This flips the post to `waiting_approval` so it shows up on the Activity page. "Rewrite"
-   re-triggers the same webhook. If `N8N_CREATE_POST_WEBHOOK_URL` is left blank, posts are
-   still created and stored, just without generated content — fill content in by hand or
-   wire the webhook later.
+   This moves the post to `waiting_approval` in the dashboard.
 
 4. **Seed sample data** (optional, safe to run once):
    ```bash
@@ -62,8 +86,8 @@ scheduled, or failed. Posts and account state are stored in MongoDB.
   There's no real LinkedIn/X/Instagram/Facebook OAuth wired up (that needs app credentials
   per platform); swap `reconnectAccountAction` in `src/lib/actions.ts` for a real OAuth flow
   when you're ready.
-- **Publishing** — this dashboard doesn't call social platform APIs directly. Approving a
-  post sets its status to `scheduled`; the assumption is your n8n workflow has its own
-  scheduler that watches for due `scheduled` posts and publishes them, then updates
-  `results.<platform>` (ideally via the same `/api/n8n/callback` route, extended for that
-  case, or directly in Mongo).
+- **Strategic Insights, Plan, and Audiences** — intentionally remain prototype screens using
+  illustrative data; they are not inputs to or outputs from the n8n workflow.
+- **Publishing** — the dashboard sends approved posts to the n8n publish webhook. Actual
+  social publishing still depends on configuring valid platform adapter endpoints and
+  credentials in the workflow.

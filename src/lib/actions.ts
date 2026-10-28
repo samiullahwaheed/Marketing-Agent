@@ -3,8 +3,8 @@
 import { ObjectId } from "mongodb";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { postsCollection, accountsCollection, settingsCollection } from "./db";
-import { triggerCreatePostWebhook } from "./n8n";
+import { getSettings, postsCollection, accountsCollection, settingsCollection } from "./db";
+import { triggerCreatePostWebhook, triggerPublishPostWebhook } from "./n8n";
 import type { Platform, PlatformContent, PlatformResult, PostDoc } from "./types";
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -25,9 +25,13 @@ export async function createPostAction(formData: FormData): Promise<void> {
   const topic = String(formData.get("topic") || "").trim();
   const date = String(formData.get("date") || "");
   const time = String(formData.get("time") || "");
+  const scheduledAt = String(formData.get("scheduledAt") || "");
   const platforms = formData.getAll("platforms").map(String) as Platform[];
   const imageMode = String(formData.get("imageMode") || "ai") as "ai" | "upload";
   const imagePrompt = String(formData.get("imagePrompt") || "").trim();
+  const audience = String(formData.get("audience") || "").trim();
+  const goal = String(formData.get("goal") || "").trim();
+  const language = String(formData.get("language") || "").trim();
   const imageFile = formData.get("imageFile");
 
   if (!topic || !date || !time || platforms.length === 0) {
@@ -44,20 +48,24 @@ export async function createPostAction(formData: FormData): Promise<void> {
   }
 
   const col = await postsCollection();
+  const settings = await getSettings();
   const now = new Date();
-  const hasWebhook = Boolean(process.env.N8N_CREATE_POST_WEBHOOK_URL);
 
   const doc: PostDoc = {
     topic,
     date,
     time,
+    scheduledAt: scheduledAt || undefined,
     platforms,
     imageMode,
     imagePrompt: imageMode === "ai" ? imagePrompt : undefined,
     imageUrl,
     content: {},
     warnings: [],
-    status: hasWebhook ? "processing" : "waiting_approval",
+    audience,
+    goal,
+    language,
+    status: "processing",
     attempts: 0,
     maxAttempts: 3,
     createdAt: now,
@@ -67,25 +75,27 @@ export async function createPostAction(formData: FormData): Promise<void> {
   const result = await col.insertOne(doc);
   const postId = String(result.insertedId);
 
-  if (hasWebhook) {
-    const res = await triggerCreatePostWebhook({
-      postId,
-      topic,
-      date,
-      time,
-      platforms,
-      imageMode,
-      imagePrompt,
-      callbackUrl: `${getBaseUrl()}/api/n8n/callback`,
+  const res = await triggerCreatePostWebhook({
+    postId,
+    topic,
+    date,
+    time,
+    scheduledAt: scheduledAt || new Date(`${date}T${time}`).toISOString(),
+    platforms,
+    imageMode,
+    imageUrl,
+    imagePrompt,
+    audience,
+    goal,
+    language,
+    brandVoice: settings.brandVoice,
+    callbackUrl: `${getBaseUrl()}/api/n8n/callback`,
+  });
+  if (!res.called || res.ok === false) {
+    await setPostFields(postId, {
+      status: "failed",
+      lastError: res.error || "Could not reach the n8n create-post workflow.",
     });
-    if (!res.called || res.ok === false) {
-      await setPostFields(postId, {
-        status: "waiting_approval",
-        warnings: [
-          "Could not reach the n8n workflow. Add content manually or check N8N_CREATE_POST_WEBHOOK_URL.",
-        ],
-      });
-    }
   }
 
   revalidatePath("/");
@@ -104,6 +114,23 @@ export async function approvePostAction(id: string): Promise<void> {
   }
 
   await setPostFields(id, { status: "scheduled", results });
+  const res = await triggerPublishPostWebhook({
+    postId: id,
+    topic: post.topic,
+    date: post.date,
+    time: post.time,
+    scheduledAt: post.scheduledAt || new Date(`${post.date}T${post.time}`).toISOString(),
+    platforms: post.platforms,
+    content: post.content,
+    imageUrl: post.imageUrl,
+    callbackUrl: `${getBaseUrl()}/api/n8n/callback`,
+  });
+  if (!res.called || res.ok === false) {
+    await setPostFields(id, {
+      status: "failed",
+      lastError: res.error || "Could not reach the n8n publish workflow.",
+    });
+  }
   revalidatePath("/");
   revalidatePath("/approvals");
   revalidatePath(`/post/${id}`);
@@ -139,22 +166,34 @@ export async function requestRewriteAction(id: string): Promise<void> {
   const post = await col.findOne({ _id: new ObjectId(id) });
   if (!post) return;
 
-  const hasWebhook = Boolean(process.env.N8N_CREATE_POST_WEBHOOK_URL);
+  const settings = await getSettings();
   await setPostFields(id, {
-    status: hasWebhook ? "processing" : "waiting_approval",
+    status: "processing",
     warnings: [],
   });
 
-  if (hasWebhook) {
-    await triggerCreatePostWebhook({
-      postId: id,
-      topic: post.topic,
-      date: post.date,
-      time: post.time,
-      platforms: post.platforms,
-      imageMode: post.imageMode,
-      imagePrompt: post.imagePrompt,
-      callbackUrl: `${getBaseUrl()}/api/n8n/callback`,
+  const res = await triggerCreatePostWebhook({
+    postId: id,
+    topic: post.topic,
+    date: post.date,
+    time: post.time,
+    scheduledAt: post.scheduledAt || new Date(`${post.date}T${post.time}`).toISOString(),
+    platforms: post.platforms,
+    imageMode: post.imageMode,
+    imageUrl: post.imageUrl,
+    imagePrompt: post.imagePrompt,
+    audience: post.audience,
+    goal: post.goal,
+    language: post.language,
+    brandVoice: settings.brandVoice,
+    rewrite: true,
+    currentContent: post.content,
+    callbackUrl: `${getBaseUrl()}/api/n8n/callback`,
+  });
+  if (!res.called || res.ok === false) {
+    await setPostFields(id, {
+      status: "failed",
+      lastError: res.error || "Could not reach the n8n rewrite workflow.",
     });
   }
 
@@ -179,6 +218,23 @@ export async function retryPostAction(id: string): Promise<void> {
       $unset: { lastError: "" },
     }
   );
+  const res = await triggerPublishPostWebhook({
+    postId: id,
+    topic: post.topic,
+    date: post.date,
+    time: post.time,
+    scheduledAt: post.scheduledAt || new Date(`${post.date}T${post.time}`).toISOString(),
+    platforms: post.platforms.filter((platform) => post.results?.[platform]?.status !== "published"),
+    content: post.content,
+    imageUrl: post.imageUrl,
+    callbackUrl: `${getBaseUrl()}/api/n8n/callback`,
+  });
+  if (!res.called || res.ok === false) {
+    await setPostFields(id, {
+      status: "failed",
+      lastError: res.error || "Could not reach the n8n publish workflow.",
+    });
+  }
 
   revalidatePath("/");
   revalidatePath("/approvals");

@@ -100,6 +100,10 @@ export default function NewPostView({ accounts, defaultTopic = "" }: { accounts:
   );
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState("09:00");
+  const scheduledAt = useMemo(() => {
+    const localDate = new Date(`${date}T${time}`);
+    return Number.isNaN(localDate.getTime()) ? "" : localDate.toISOString();
+  }, [date, time]);
 
   function toggle(p: Platform) {
     setSelected((prev) => {
@@ -115,6 +119,10 @@ export default function NewPostView({ accounts, defaultTopic = "" }: { accounts:
 
   return (
     <form action={createPostAction} className="flex flex-col gap-6 max-w-[1120px] mx-auto">
+      <input type="hidden" name="audience" value={audience} />
+      <input type="hidden" name="goal" value={goal} />
+      <input type="hidden" name="language" value={language} />
+      <input type="hidden" name="scheduledAt" value={scheduledAt} />
       <PageHeader
         title="New post"
         subtitle={
