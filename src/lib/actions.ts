@@ -172,20 +172,21 @@ export async function rejectPostAction(
   revalidatePath(`/post/${id}/review`);
 }
 
-export async function requestRewriteAction(id: string, request?: RewriteRequest): Promise<void> {
-  const post = await getPostById(id);
-  if (!post) return;
-
+/** Sends a post to the n8n create workflow: a rewrite when `rewrite` is set, otherwise a fresh first draft. */
+async function startGeneration(post: Post, rewrite?: { request?: RewriteRequest }): Promise<void> {
+  const id = post.id;
   const settings = await getSettings();
   await updatePost(id, {
     status: "processing",
     warnings: [],
+    lastError: null,
   });
 
   try {
     // Keep the current image; only ask n8n for a new one if the last attempt never produced it.
     const imageUpload =
       post.imageMode === "ai" && !post.imageUrl ? await createImageUploadTarget(id) : undefined;
+    const request = rewrite?.request;
     const platforms = request?.platforms?.length
       ? post.platforms.filter((p) => request.platforms?.includes(p))
       : post.platforms;
@@ -206,20 +207,25 @@ export async function requestRewriteAction(id: string, request?: RewriteRequest)
       language: post.language,
       brandVoice: settings.brandVoice,
       bannedWords: settings.bannedWords,
-      rewrite: true,
-      rewriteRequest: request,
-      currentContent: post.content,
+      ...(rewrite ? { rewrite: true, rewriteRequest: request, currentContent: post.content } : {}),
       callbackUrl: callbackUrl(),
     });
     if (!res.called || res.ok === false) {
-      throw new Error(res.error || "Could not reach the n8n rewrite workflow.");
+      throw new Error(res.error || "Could not reach the n8n create-post workflow.");
     }
   } catch (err) {
     await updatePost(id, {
       status: "failed",
-      lastError: err instanceof Error ? err.message : "Could not start the rewrite workflow.",
+      lastError: err instanceof Error ? err.message : "Could not start the create-post workflow.",
     });
   }
+}
+
+export async function requestRewriteAction(id: string, request?: RewriteRequest): Promise<void> {
+  const post = await getPostById(id);
+  if (!post) return;
+
+  await startGeneration(post, { request });
 
   revalidatePath("/approvals");
   revalidatePath(`/post/${id}`);
@@ -229,7 +235,24 @@ export async function retryPostAction(id: string): Promise<void> {
   const post = await getPostById(id);
   if (!post) return;
 
+  // Failed before any draft was written (e.g. n8n unreachable): write the draft again, don't publish.
+  if (!post.platforms.some((p) => post.content[p]?.text)) {
+    await updatePost(id, { attempts: (post.attempts || 0) + 1, lastAttemptAt: new Date().toISOString() });
+    await startGeneration(post);
+    revalidatePath("/");
+    revalidatePath("/approvals");
+    revalidatePath(`/post/${id}`);
+    return;
+  }
+
   const platforms = post.platforms.filter((platform) => post.results?.[platform]?.status !== "published");
+  if (platforms.length === 0) {
+    await updatePost(id, { status: "published", lastError: null });
+    revalidatePath("/");
+    revalidatePath("/approvals");
+    revalidatePath(`/post/${id}`);
+    return;
+  }
   const results: Partial<Record<Platform, PlatformResult>> = { ...(post.results || {}) };
   for (const p of platforms) {
     results[p] = { ...(results[p] || { status: "not_sent" }), status: "scheduled", error: undefined };
