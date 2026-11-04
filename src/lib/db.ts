@@ -1,4 +1,5 @@
 import "server-only";
+import { PLATFORM_ORDER } from "./platforms";
 import { getSupabase, unwrap, unwrapOne } from "./supabase";
 import type {
   AccountDoc,
@@ -41,6 +42,14 @@ export interface PostRow {
 
 const opt = <T,>(v: T | null): T | undefined => (v === null ? undefined : v);
 
+// Rows written before a platform was removed (e.g. X) must not crash the UI.
+const KNOWN_PLATFORMS: readonly string[] = PLATFORM_ORDER;
+const isKnownPlatform = (p: string): p is Platform => KNOWN_PLATFORMS.includes(p);
+
+function pickKnown<T>(map: Partial<Record<string, T>> | null | undefined): Partial<Record<Platform, T>> {
+  return Object.fromEntries(Object.entries(map ?? {}).filter(([p]) => isKnownPlatform(p))) as Partial<Record<Platform, T>>;
+}
+
 export function serializePost(row: PostRow): Post {
   return {
     id: row.id,
@@ -49,20 +58,20 @@ export function serializePost(row: PostRow): Post {
     time: row.post_time,
     scheduledAt: opt(row.scheduled_at),
     postNow: row.post_now,
-    platforms: row.platforms,
+    platforms: (row.platforms ?? []).filter(isKnownPlatform),
     imageMode: row.image_mode,
     imagePrompt: opt(row.image_prompt),
     imageUrl: opt(row.image_url),
     audience: opt(row.audience),
     language: opt(row.language),
-    content: row.content ?? {},
+    content: pickKnown(row.content),
     warnings: row.warnings ?? [],
     status: row.status,
     attempts: row.attempts,
     maxAttempts: row.max_attempts,
     lastError: opt(row.last_error),
     lastAttemptAt: opt(row.last_attempt_at),
-    results: row.results ?? {},
+    results: pickKnown(row.results),
     rejectionReason: opt(row.rejection_reason),
     rejectionNote: opt(row.rejection_note),
     createdAt: new Date(row.created_at).toISOString(),
@@ -173,9 +182,10 @@ export async function getAccounts(): Promise<Account[]> {
       "Could not create default accounts"
     ) as AccountRow[];
   }
-  const order = ["linkedin", "instagram", "facebook"];
-  rows.sort((a, b) => order.indexOf(a.platform) - order.indexOf(b.platform));
-  return rows.map(serializeAccount);
+  return rows
+    .filter((r) => isKnownPlatform(r.platform))
+    .sort((a, b) => PLATFORM_ORDER.indexOf(a.platform) - PLATFORM_ORDER.indexOf(b.platform))
+    .map(serializeAccount);
 }
 
 export async function setAccountStatus(platform: Platform, status: AccountDoc["status"]): Promise<void> {
