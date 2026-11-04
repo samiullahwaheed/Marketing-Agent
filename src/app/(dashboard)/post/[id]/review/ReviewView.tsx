@@ -89,7 +89,7 @@ export default function ReviewView({ post, accounts }: { post: Post; accounts: A
       <BackLink to="/approvals">Approvals</BackLink>
       <header className="flex flex-col gap-2">
         <span className="self-start">
-          <StatusChip status={post.status} />
+          <StatusChip status={post.status} postNow={post.postNow} />
         </span>
         <h1 className="heading text-[32px] sm:text-[38px] leading-[1.08]">{post.topic}</h1>
         <p className="m-0 text-muted text-base">

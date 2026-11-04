@@ -49,7 +49,7 @@ export default function PublishedView({ post }: { post: Post }) {
       <header className="flex flex-wrap gap-4 items-end justify-between">
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-2 items-center">
-            <StatusChip status={post.status} />
+            <StatusChip status={post.status} postNow={post.postNow} />
             <span className="text-muted text-sm flex items-center gap-1.5">
               <PlatformBadge platform={platform} size="sm" />
               {post.platforms.map((p) => PLATFORMS[p].label).join(" + ")} · {formatDayMonthTime(post.date, post.time)}

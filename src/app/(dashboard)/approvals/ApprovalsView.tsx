@@ -31,7 +31,7 @@ function WaitingCard({ post }: { post: Post }) {
       </Link>
       <div className="flex-[1_1_360px] min-w-0 flex flex-col gap-3">
         <div className="flex flex-wrap gap-2 items-center">
-          <StatusChip status={post.status} />
+          <StatusChip status={post.status} postNow={post.postNow} />
         </div>
         <h2 className="heading text-[26px]">
           <Link href={review} className="text-ink no-underline hover:text-ink">
@@ -209,10 +209,12 @@ export default function ApprovalsView({
                     <div className="text-muted text-sm">
                       {post.status === "rejected"
                         ? post.rejectionReason ?? "Rejected"
-                        : `Scheduled for ${formatDayMonthTime(post.date, post.time)}`}
+                        : post.postNow
+                          ? "Publishing now"
+                          : `Scheduled for ${formatDayMonthTime(post.date, post.time)}`}
                     </div>
                   </div>
-                  <StatusChip status={post.status} />
+                  <StatusChip status={post.status} postNow={post.postNow} />
                 </div>
               ))
             )}
@@ -238,10 +240,11 @@ export default function ApprovalsView({
                     {post.status === "published" && `Published ${formatDayMonth(post.date)}`}
                     {post.status === "failed" && (post.lastError || `Failed · tried ${post.attempts} of ${post.maxAttempts}`)}
                     {post.status === "rejected" && (post.rejectionReason ?? "Rejected")}
-                    {post.status === "scheduled" && `Scheduled for ${formatDayMonthTime(post.date, post.time)}`}
+                    {post.status === "scheduled" &&
+                      (post.postNow ? "Publishing now" : `Scheduled for ${formatDayMonthTime(post.date, post.time)}`)}
                   </div>
                 </div>
-                <StatusChip status={post.status} />
+                <StatusChip status={post.status} postNow={post.postNow} />
               </Link>
             ))
           ) : (
