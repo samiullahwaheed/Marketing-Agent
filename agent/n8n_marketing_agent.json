@@ -328,8 +328,8 @@
         "modelId": {
           "__rl": true,
           "mode": "list",
-          "value": "gpt-image-1",
-          "cachedResultName": "GPT-IMAGE-1"
+          "value": "gpt-image-2",
+          "cachedResultName": "GPT-IMAGE-2"
         },
         "prompt": "={{ $json.text || $('Aggregate Generated Content').first().json.imagePrompt || ('Professional social media image, no text, about: ' + $('Aggregate Generated Content').first().json.topic) }}",
         "options": {
@@ -370,10 +370,10 @@
       "id": "af9dae62-2e72-5a06-8e67-0c40be526a4e",
       "name": "Image to File",
       "type": "n8n-nodes-base.editImage",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [
-        2380,
-        -220
+        2400,
+        -300
       ],
       "onError": "continueRegularOutput"
     },
@@ -406,8 +406,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2600,
-        -220
+        2620,
+        -300
       ],
       "retryOnFail": true,
       "maxTries": 3,
@@ -416,7 +416,41 @@
     },
     {
       "parameters": {
-        "jsCode": "const base = $('Aggregate Generated Content').first().json;\nconst genError = $('Generate Image').first().json.error;\nconst upError = $json.error;\nif (genError || upError) {\n  const msg = (genError ?? upError)?.message ?? String(genError ?? upError);\n  return [{ json: { ...base, imageUrl: null, warnings: [...base.warnings, 'AI image could not be created: ' + msg + '. Upload one on the review page.'] } }];\n}\nreturn [{ json: { ...base, imageUrl: base.imageUpload.publicUrl } }];"
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "257e5376-6232-5d7c-a8bd-a498f3aa1b9b",
+              "leftValue": "={{ Boolean($binary?.data) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4f13f478-3b74-558f-9bec-5d6a4d207ebc",
+      "name": "Image Generated?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2270,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('Aggregate Generated Content').first().json;\nconst gen = $('Generate Image').first();\nconst genError = gen.json.error ?? (gen.binary?.data ? null : 'the image model returned no image (check the model on Generate Image)');\nconst upError = $('Image Generated?').first().binary?.data ? $json.error : null;\nif (genError || upError) {\n  const msg = (genError ?? upError)?.message ?? String(genError ?? upError);\n  return [{ json: { ...base, imageUrl: null, warnings: [...base.warnings, 'AI image could not be created: ' + msg + '. Upload one on the review page.'] } }];\n}\nreturn [{ json: { ...base, imageUrl: base.imageUpload.publicUrl } }];"
       },
       "id": "c29ef45e-91b0-586c-8ef2-a1a0e2a88d4e",
       "name": "Attach AI Image",
@@ -1111,7 +1145,25 @@
       "main": [
         [
           {
+            "node": "Image Generated?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Generated?": {
+      "main": [
+        [
+          {
             "node": "Image to File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Attach AI Image",
             "type": "main",
             "index": 0
           }

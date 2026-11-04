@@ -39,7 +39,7 @@ live in Supabase Storage.
    URL for the AI image), `audience`, `language`, `brandVoice`, `bannedWords` and
    `callbackUrl`. Rewrites add `rewrite`, `rewriteRequest` (instructions, options, platforms,
    keepHashtags) and `currentContent`. Claude writes each platform's post and the image
-   prompt; OpenAI `gpt-image-1` renders a JPEG, which n8n PUTs to `imageUpload.signedUrl`.
+   prompt; OpenAI `gpt-image-2` (n8n free credits) renders the image, converted to JPEG, which n8n PUTs to `imageUpload.signedUrl`.
    The webhook answers `202` once the request is valid, or `400` with the reason.
 
    Generation callback:
