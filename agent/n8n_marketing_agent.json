@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Setup after import\n\n**Credentials to select**\n- **Header Auth account** (webhooks + callbacks). Header name `x-api-key`, value = `N8N_WEBHOOK_API_KEY`. Set `N8N_CALLBACK_SECRET` in the dashboard to the same value.\n- **Anthropic account**: 3 Claude nodes\n- **OpenAI account**: *Generate Image* (Claude has no image output, so Claude writes the prompt and OpenAI renders it)\n- **LinkedIn account**, **X account**\n- **Facebook Graph account**: a **Page** access token with `pages_manage_posts`, `pages_read_engagement`, `instagram_basic`, `instagram_content_publish`\n\n**IDs to set** in *Normalize Publish Request*\n- `facebookPageId`\n- `instagramAccountId`: the Instagram *Business* Account ID, **not** the Page ID (`GET /{page-id}?fields=instagram_business_account`)\n\n**Storage**: no credential needed. The dashboard sends a one-off Supabase signed upload URL with each request.",
+        "content": "## Setup after import\n\n**Credentials to select**\n- **Header Auth account** (webhooks + callbacks). Header name `x-api-key`, value = `N8N_WEBHOOK_API_KEY`. Set `N8N_CALLBACK_SECRET` in the dashboard to the same value.\n- **Anthropic account**: 3 Claude nodes\n- *Generate Image* uses n8n's free **Gateway credits** (OpenAI). Claude has no image output, so Claude writes the prompt and OpenAI renders it\n- **LinkedIn account**, **X account**\n- **Facebook Graph account**: a **Page** access token with `pages_manage_posts`, `pages_read_engagement`, `instagram_basic`, `instagram_content_publish`\n\n**IDs to set** in *Normalize Publish Request*\n- `facebookPageId`\n- `instagramAccountId`: the Instagram *Business* Account ID, **not** the Page ID (`GET /{page-id}?fields=instagram_business_account`)\n\n**Storage**: no credential needed. The dashboard sends a one-off Supabase signed upload URL with each request.",
         "height": 700,
         "width": 460,
         "color": 6
@@ -19,7 +19,7 @@
     },
     {
       "parameters": {
-        "content": "## 1. Create / rewrite post\nDashboard → validate → Claude writes one post per platform → Claude writes image prompt → OpenAI renders JPEG → upload to Supabase Storage → callback to dashboard (waiting_approval or failed)",
+        "content": "## 1. Create / rewrite post\nDashboard → validate → Claude writes one post per platform → Claude writes image prompt → OpenAI (n8n free credits) renders → convert to JPEG → upload to Supabase Storage → callback to dashboard (waiting_approval or failed)",
         "height": 120,
         "width": 3260,
         "color": 4
@@ -324,40 +324,53 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://api.openai.com/v1/images/generations",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "openAiApi",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ {\n  model: 'gpt-image-1',\n  prompt: $json.text || $('Aggregate Generated Content').first().json.imagePrompt || ('Professional social media image, no text, about: ' + $('Aggregate Generated Content').first().json.topic),\n  size: '1024x1024',\n  quality: 'medium',\n  output_format: 'jpeg',\n  n: 1\n} }}",
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-image-1",
+          "cachedResultName": "GPT-IMAGE-1"
+        },
+        "prompt": "={{ $json.text || $('Aggregate Generated Content').first().json.imagePrompt || ('Professional social media image, no text, about: ' + $('Aggregate Generated Content').first().json.topic) }}",
         "options": {
-          "timeout": 180000
+          "quality": "medium",
+          "size": "1024x1024"
         }
       },
       "id": "500e7280-d1f8-5e7a-947e-415031a7e015",
       "name": "Generate Image",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
       "position": [
         2160,
         -220
       ],
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "operation": "toBinary",
-        "sourceProperty": "data[0].b64_json",
+        "operation": "resize",
+        "dataPropertyName": "data",
+        "width": 1080,
+        "height": 1080,
+        "resizeOption": "ignoreAspectRatio",
         "options": {
-          "fileName": "post-image.jpg",
-          "mimeType": "image/jpeg"
+          "format": "jpeg",
+          "quality": 90,
+          "fileName": "post-image.jpg"
         }
       },
       "id": "af9dae62-2e72-5a06-8e67-0c40be526a4e",
       "name": "Image to File",
-      "type": "n8n-nodes-base.convertToFile",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1,
       "position": [
         2380,
         -220
