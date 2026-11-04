@@ -140,7 +140,8 @@
     },
     {
       "parameters": {
-        "jsCode": "const rules = {\n  linkedin: { maxCharacters: 3000, style: 'professional, first-person, short paragraphs, a question at the end' },\n  instagram: { maxCharacters: 2200, style: 'visual and engaging, line breaks, caption for an image' },\n  facebook: { maxCharacters: 63206, style: 'conversational and warm' },\n};\nreturn [{ json: { ...$json, platformRules: rules[$json.platform] ?? { maxCharacters: 2000, style: 'social' } } }];"
+        "mode": "runOnceForEachItem",
+        "jsCode": "const rules = {\n  linkedin: { maxCharacters: 3000, style: 'professional, first-person, short paragraphs, a question at the end' },\n  instagram: { maxCharacters: 2200, style: 'visual and engaging, line breaks, caption for an image' },\n  facebook: { maxCharacters: 63206, style: 'conversational and warm' },\n};\n// Runs once per platform item coming out of \"Split Platforms\".\nreturn { json: { ...$json, platformRules: rules[$json.platform] ?? { maxCharacters: 2000, style: 'social' } } };"
       },
       "id": "f8ca4996-3e8e-5ae3-8174-8ef2f27d8de3",
       "name": "Platform Rules",
