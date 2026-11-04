@@ -74,7 +74,7 @@ export default function PublishedView({ post }: { post: Post }) {
 
       <Card className="px-6 py-[22px] flex flex-col gap-3.5">
         <h2 className="heading text-xl">The post</h2>
-        <PostImage className="w-full" aspect="1200/627" />
+        <PostImage className="w-full" aspect="1200/627" src={post.imageUrl} alt={post.topic} />
         <div className="m-0 text-nav flex flex-col gap-2">
           {paragraphs(primaryText).map((p, i) => (
             <p key={i} className="m-0">

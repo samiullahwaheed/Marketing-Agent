@@ -63,7 +63,7 @@ export default function RejectView({ post, bannedWords }: { post: Post; bannedWo
         <section className="bg-white/35 backdrop-blur-md border border-white/50 rounded-2xl px-6 py-[22px] flex flex-col gap-3.5">
           <p className="eyebrow">The post</p>
           <div className="flex gap-3.5 items-center">
-            <PostImage className="w-24" aspect="1/1" />
+            <PostImage className="w-24" aspect="1/1" src={post.imageUrl} alt={post.topic} />
             <div>
               <div className="heading text-xl">{post.topic}</div>
               <div className="text-muted text-sm flex items-center gap-1.5 mt-1">

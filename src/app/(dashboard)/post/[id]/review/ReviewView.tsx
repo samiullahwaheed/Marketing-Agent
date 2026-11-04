@@ -164,7 +164,12 @@ export default function ReviewView({ post, accounts }: { post: Post; accounts: A
                 )}
               </div>
             )}
-            <PostImage className="w-full" aspect="1200/627" />
+            <PostImage
+              className="w-full"
+              aspect={`${PLATFORMS[active].imageWidth}/${PLATFORMS[active].imageHeight}`}
+              src={post.imageUrl}
+              alt={post.topic}
+            />
             <div className="flex justify-between gap-3 text-muted text-[12.5px]">
               <span>
                 {PLATFORMS[active].imageWidth} × {PLATFORMS[active].imageHeight} · fits {PLATFORMS[active].label}

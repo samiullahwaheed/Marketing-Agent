@@ -1,5 +1,26 @@
-/** The desk illustration used as the sample post image. */
-export function PostImage({ className = "", aspect = "16/10" }: { className?: string; aspect?: string }) {
+/** The post's image when it has one, otherwise the desk illustration used as a placeholder. */
+export function PostImage({
+  className = "",
+  aspect = "16/10",
+  src,
+  alt = "Post image",
+}: {
+  className?: string;
+  aspect?: string;
+  src?: string;
+  alt?: string;
+}) {
+  if (src) {
+    return (
+      <div
+        className={`max-w-full rounded-xl overflow-hidden bg-[#DCE6DF] flex-none ${className}`}
+        style={{ aspectRatio: aspect }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- remote Supabase URL, sized by the wrapper */}
+        <img src={src} alt={alt} className="w-full h-full object-cover" loading="lazy" />
+      </div>
+    );
+  }
   return (
     <div
       className={`max-w-full rounded-xl overflow-hidden bg-[#DCE6DF] flex-none ${className}`}

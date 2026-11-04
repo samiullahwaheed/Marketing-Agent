@@ -27,7 +27,7 @@ function WaitingCard({ post }: { post: Post }) {
   return (
     <Card className="p-6 flex flex-wrap gap-6">
       <Link href={review} aria-label={`Open ${post.topic}`} className="block flex-none">
-        <PostImage className="w-[260px]" />
+        <PostImage className="w-[260px]" src={post.imageUrl} alt={post.topic} />
       </Link>
       <div className="flex-[1_1_360px] min-w-0 flex flex-col gap-3">
         <div className="flex flex-wrap gap-2 items-center">
