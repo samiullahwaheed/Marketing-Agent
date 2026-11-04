@@ -59,7 +59,6 @@ async function main() {
     check(
       await supabase.from("accounts").upsert([
         { platform: "linkedin", label: "LinkedIn", status: "connected" },
-        { platform: "x", label: "X", status: "reconnect" },
         { platform: "instagram", label: "Instagram", status: "connected" },
         { platform: "facebook", label: "Facebook", status: "connected" },
       ]),
@@ -107,7 +106,7 @@ async function main() {
     {
       topic: "Why clients ghost invoices",
       ...ghostInvoices,
-      platforms: ["linkedin", "x"],
+      platforms: ["linkedin", "facebook"],
       imageMode: "ai",
       imagePrompt: "Flat illustration, an unpaid invoice on a desk",
       content: {},
@@ -115,7 +114,7 @@ async function main() {
       status: "scheduled",
       attempts: 0,
       maxAttempts: 3,
-      results: { linkedin: { status: "scheduled" }, x: { status: "scheduled" } },
+      results: { linkedin: { status: "scheduled" }, facebook: { status: "scheduled" } },
     },
     {
       topic: "Three automations to start with",
@@ -133,7 +132,7 @@ async function main() {
     {
       topic: "Automating client onboarding",
       ...onboardingDue,
-      platforms: ["linkedin", "x"],
+      platforms: ["linkedin", "instagram"],
       imageMode: "ai",
       imagePrompt: "Flat illustration, a welcome form filling itself in",
       content: {
@@ -141,7 +140,7 @@ async function main() {
           text: "Onboarding a new client used to take me four emails and a spreadsheet. Now it takes one form...",
           hashtags: ["automation", "n8n"],
         },
-        x: {
+        instagram: {
           text: "Onboarding a new client used to take four emails and a spreadsheet. Now it's one form.",
           hashtags: ["automation"],
         },
@@ -151,7 +150,7 @@ async function main() {
       attempts: 2,
       maxAttempts: 3,
       lastError:
-        "The post was written and the image was made. X refused to accept it because the account needs reconnecting.",
+        "The post was written and the image was made. Instagram refused it because the account needs reconnecting.",
       lastAttemptAt: isoAt(-3, 9, 32),
       results: {
         linkedin: {
@@ -159,7 +158,7 @@ async function main() {
           url: "https://www.linkedin.com/feed/",
           publishedAt: isoAt(-3, 9, 0),
         },
-        x: { status: "failed", error: "Login expired" },
+        instagram: { status: "failed", error: "Login expired" },
       },
     },
     {
@@ -219,7 +218,7 @@ async function main() {
     {
       topic: "Manual invoicing costs",
       ...manualInvoicing,
-      platforms: ["linkedin", "x", "instagram", "facebook"],
+      platforms: ["linkedin", "instagram", "facebook"],
       imageMode: "ai",
       imagePrompt: "Flat illustration, muted colours, a desk with papers",
       content: {
@@ -227,11 +226,6 @@ async function main() {
           text: "A client called me last month. His accountant quit.\n\nTurns out she was spending 11 hours a week on invoices. Copying numbers from emails into a spreadsheet. Then into the accounting software. Then chasing people who didn't pay.\n\nEleven hours. Every week. For copy-paste.\n\nWe rebuilt it in two days. Invoice arrives, data gets pulled out, row added, reminder sent on day 7 if nobody paid.\n\nWhat's the dumbest manual task still eating your week?",
           hashtags: ["automation", "n8n", "smallbusiness"],
           suggestedHashtags: ["invoicing", "nocode", "workflow", "bookkeeping"],
-        },
-        x: {
-          text: "Eleven hours a week. That's what one client spent on invoices.\n\nCopy from email. Paste in sheet. Chase the ones who never paid.\n\nRebuilt it in two days.\n\nWhat's eating your week?",
-          hashtags: ["automation", "n8n"],
-          suggestedHashtags: ["nocode", "invoicing", "productivity"],
         },
         instagram: {
           text: "Eleven hours a week, gone to copy-paste.\n\nOne client was moving invoice numbers from email to spreadsheet to accounting software by hand. Then chasing everyone who hadn't paid.\n\nWe rebuilt the whole thing in two days. Now the invoice arrives and everything happens on its own.\n\nWhat's the dumbest manual job still eating your week?",

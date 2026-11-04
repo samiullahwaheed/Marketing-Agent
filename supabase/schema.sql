@@ -34,7 +34,7 @@ create index if not exists posts_date_idx on public.posts (post_date, post_time)
 create index if not exists posts_updated_idx on public.posts (updated_at desc);
 
 create table if not exists public.accounts (
-  platform text primary key check (platform in ('linkedin', 'x', 'instagram', 'facebook')),
+  platform text primary key check (platform in ('linkedin', 'instagram', 'facebook')),
   label text not null,
   status text not null default 'connected' check (status in ('connected', 'reconnect', 'not_connected')),
   updated_at timestamptz not null default now()

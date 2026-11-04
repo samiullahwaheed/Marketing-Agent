@@ -16,11 +16,11 @@ import type { Platform, PlatformContent, PlatformResult, PostStatus } from "@/li
 //   "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/post-images/...",
 //   "content": {
 //     "linkedin": { "text": "...", "hashtags": ["automation", "n8n"], "suggestedHashtags": ["nocode"] },
-//     "x": { "text": "...", "hashtags": [...] }
+//     "facebook": { "text": "...", "hashtags": [...] }
 //   },
 //   "warnings": ["\"11 hours\" has no source — check before posting"],
 //   "status": "waiting_approval",          // or "failed" together with "error"
-//   "error": "Claude returned no text for x"
+//   "error": "Claude returned no text for facebook"
 // }
 //
 // Publish callback:

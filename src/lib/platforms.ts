@@ -3,7 +3,7 @@ import type { Platform } from "./types";
 export interface PlatformMeta {
   key: Platform;
   label: string;
-  /** Short mark used in badges, e.g. "in", "X", "IG", "f". */
+  /** Short mark used in badges, e.g. "in", "IG", "f". */
   short: string;
   /** Tailwind background colour class for badges/tiles. */
   bg: string;
@@ -16,7 +16,7 @@ export interface PlatformMeta {
   imageHeight: number;
 }
 
-export const PLATFORM_ORDER: Platform[] = ["linkedin", "x", "instagram", "facebook"];
+export const PLATFORM_ORDER: Platform[] = ["linkedin", "instagram", "facebook"];
 
 export const PLATFORMS: Record<Platform, PlatformMeta> = {
   linkedin: {
@@ -30,17 +30,6 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
     cutoffLabel: '"see more"',
     imageWidth: 1200,
     imageHeight: 627,
-  },
-  x: {
-    key: "x",
-    label: "X",
-    short: "X",
-    bg: "bg-x",
-    charLimit: 280,
-    maxHashtags: 2,
-    threadNote: "Over 280 becomes a thread",
-    imageWidth: 1200,
-    imageHeight: 675,
   },
   instagram: {
     key: "instagram",

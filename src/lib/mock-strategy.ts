@@ -87,7 +87,6 @@ export const insights: Insights = {
   platforms: [
     { platform: "linkedin", connected: true, posts: 7, views: 4200, interactions: 231, engagement: "5.5%" },
     { platform: "instagram", connected: true, posts: 4, views: 1700, interactions: 76, engagement: "4.5%" },
-    { platform: "x", connected: true, posts: 1, views: 400, interactions: 8, engagement: "2.0%", weak: true },
     { platform: "facebook", connected: false },
   ],
   topics: [
@@ -116,17 +115,6 @@ export const plan: Plan = {
       title: "Invoice automation gets 2.5× the interactions of tool comparisons",
       text: "But it's only 4 of your 12 posts. Swap a couple of tool-comparison slots for invoicing stories.",
       buttons: [{ label: "Draft 3 invoicing posts", to: "/new-post", variant: "primary" }],
-    },
-    {
-      id: "rethink-x",
-      kind: "Rethink this",
-      tone: "error",
-      title: "X isn't working for you yet",
-      text: "1 post, 8 interactions (2% engagement vs 5.5% on LinkedIn). Try short, question-led posts, or pause X and spend the time on LinkedIn.",
-      buttons: [
-        { label: "Try X-style posts", doneLabel: "X-style posts on" },
-        { label: "Pause X", variant: "ghost", doneLabel: "X paused" },
-      ],
     },
     {
       id: "timing",

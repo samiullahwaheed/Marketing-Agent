@@ -83,7 +83,7 @@ live in Supabase Storage.
 - **Post now vs. schedule** — leaving the schedule off publishes the post as soon as it is
   approved.
 - **Reconnect / Add account buttons** — flip the account's status to `connected` in the
-  database. There's no real LinkedIn/X/Instagram/Facebook OAuth in the app; those
+  database. There's no real LinkedIn/Instagram/Facebook OAuth in the app; those
   credentials live in n8n.
 - **Strategic Insights, Plan, and Audiences** — intentionally remain prototype screens using
   illustrative data; they are not inputs to or outputs from the n8n workflow.

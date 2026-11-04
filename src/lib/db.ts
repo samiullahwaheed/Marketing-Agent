@@ -160,7 +160,6 @@ export function serializeAccount(row: AccountRow): Account {
 
 const DEFAULT_ACCOUNTS: Array<Pick<AccountDoc, "platform" | "label" | "status">> = [
   { platform: "linkedin", label: "LinkedIn", status: "connected" },
-  { platform: "x", label: "X", status: "reconnect" },
   { platform: "instagram", label: "Instagram", status: "connected" },
   { platform: "facebook", label: "Facebook", status: "connected" },
 ];
@@ -174,7 +173,7 @@ export async function getAccounts(): Promise<Account[]> {
       "Could not create default accounts"
     ) as AccountRow[];
   }
-  const order = ["linkedin", "x", "instagram", "facebook"];
+  const order = ["linkedin", "instagram", "facebook"];
   rows.sort((a, b) => order.indexOf(a.platform) - order.indexOf(b.platform));
   return rows.map(serializeAccount);
 }

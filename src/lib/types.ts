@@ -1,4 +1,4 @@
-export type Platform = "linkedin" | "x" | "instagram" | "facebook";
+export type Platform = "linkedin" | "instagram" | "facebook";
 
 export type PostStatus =
   | "processing"
