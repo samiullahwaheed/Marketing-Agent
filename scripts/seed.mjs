@@ -1,16 +1,20 @@
-// Seeds MongoDB with sample data so the dashboard looks populated on first run.
-// Usage: npm run seed
-// Safe to re-run: only inserts posts if the "posts" collection is currently empty.
-import { MongoClient } from "mongodb";
+// Seeds Supabase with sample data so the dashboard looks populated on first run.
+// Usage: npm run seed   (run supabase/schema.sql in the SQL editor first)
+// Safe to re-run: only inserts posts if the "posts" table is currently empty.
+import { createClient } from "@supabase/supabase-js";
 
-const uri = process.env.MONGODB_URI;
-const dbName = process.env.MONGODB_DB || "Agent";
+const url = process.env.SUPABASE_URL;
+const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!uri || uri.includes("USER:PASSWORD@HOST")) {
-  console.error(
-    "MONGODB_URI in .env.local still has placeholder USER/PASSWORD/HOST. Fill in your real Atlas connection string first."
-  );
+if (!url || !key) {
+  console.error("Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local first.");
   process.exit(1);
+}
+
+const supabase = createClient(url, key, { auth: { persistSession: false } });
+
+function check({ error }, context) {
+  if (error) throw new Error(`${context}: ${error.message}`);
 }
 
 function daysFromNow(days, hh = 9, mm = 0) {
@@ -28,45 +32,55 @@ function isoAt(days, hh, mm) {
   return d.toISOString();
 }
 
+function toRow(doc) {
+  return {
+    topic: doc.topic,
+    post_date: doc.date,
+    post_time: doc.time,
+    scheduled_at: new Date(`${doc.date}T${doc.time}:00`).toISOString(),
+    post_now: false,
+    platforms: doc.platforms,
+    image_mode: doc.imageMode,
+    image_prompt: doc.imagePrompt ?? null,
+    content: doc.content,
+    warnings: doc.warnings,
+    status: doc.status,
+    attempts: doc.attempts,
+    max_attempts: doc.maxAttempts,
+    last_error: doc.lastError ?? null,
+    last_attempt_at: doc.lastAttemptAt ?? null,
+    results: doc.results ?? {},
+  };
+}
+
 async function main() {
-  const client = new MongoClient(uri);
-  await client.connect();
-  const db = client.db(dbName);
-
-  const accounts = db.collection("accounts");
-  const settings = db.collection("settings");
-  const posts = db.collection("posts");
-
-  if ((await accounts.countDocuments()) === 0) {
-    const now = new Date();
-    await accounts.insertMany([
-      { platform: "linkedin", label: "LinkedIn", status: "connected", updatedAt: now },
-      { platform: "x", label: "X", status: "reconnect", updatedAt: now },
-      { platform: "instagram", label: "Instagram", status: "connected", updatedAt: now },
-      { platform: "facebook", label: "Facebook", status: "connected", updatedAt: now },
-    ]);
+  const { count: accountCount } = await supabase.from("accounts").select("platform", { count: "exact", head: true });
+  if (!accountCount) {
+    check(
+      await supabase.from("accounts").upsert([
+        { platform: "linkedin", label: "LinkedIn", status: "connected" },
+        { platform: "x", label: "X", status: "reconnect" },
+        { platform: "instagram", label: "Instagram", status: "connected" },
+        { platform: "facebook", label: "Facebook", status: "connected" },
+      ]),
+      "Seeding accounts"
+    );
     console.log("Seeded accounts");
   }
 
-  await settings.updateOne(
-    { _id: "global" },
-    {
-      $setOnInsert: {
-        aiCreditsPercent: 12,
-        aiCreditsPostsLeft: 6,
-        brandVoice: { tone: "", keywords: "", sampleText: "", doNots: "" },
-      },
-    },
-    { upsert: true }
+  check(
+    await supabase
+      .from("settings")
+      .upsert({ id: "global", ai_credits_percent: 12, ai_credits_posts_left: 6 }, { onConflict: "id", ignoreDuplicates: true }),
+    "Seeding settings"
   );
 
-  if ((await posts.countDocuments()) > 0) {
-    console.log("posts collection already has data — skipping post seed.");
-    await client.close();
+  const { count: postCount, error } = await supabase.from("posts").select("id", { count: "exact", head: true });
+  if (error) throw new Error(`Counting posts: ${error.message}`);
+  if (postCount) {
+    console.log("posts table already has data — skipping post seed.");
     return;
   }
-
-  const now = new Date();
 
   const manualInvoicing = daysFromNow(10);
   const n8nVsZapier = daysFromNow(8);
@@ -89,8 +103,6 @@ async function main() {
       attempts: 0,
       maxAttempts: 3,
       results: { linkedin: { status: "scheduled" } },
-      createdAt: now,
-      updatedAt: now,
     },
     {
       topic: "Why clients ghost invoices",
@@ -104,8 +116,6 @@ async function main() {
       attempts: 0,
       maxAttempts: 3,
       results: { linkedin: { status: "scheduled" }, x: { status: "scheduled" } },
-      createdAt: now,
-      updatedAt: now,
     },
     {
       topic: "Three automations to start with",
@@ -119,8 +129,6 @@ async function main() {
       attempts: 0,
       maxAttempts: 3,
       results: { linkedin: { status: "scheduled" } },
-      createdAt: now,
-      updatedAt: now,
     },
     {
       topic: "Automating client onboarding",
@@ -153,8 +161,6 @@ async function main() {
         },
         x: { status: "failed", error: "Login expired" },
       },
-      createdAt: now,
-      updatedAt: now,
     },
     {
       topic: "Five n8n mistakes",
@@ -182,8 +188,6 @@ async function main() {
           comments: 2,
         },
       },
-      createdAt: now,
-      updatedAt: now,
     },
     {
       topic: "Why I left Zapier",
@@ -211,8 +215,6 @@ async function main() {
           comments: 3,
         },
       },
-      createdAt: now,
-      updatedAt: now,
     },
     {
       topic: "Manual invoicing costs",
@@ -246,15 +248,11 @@ async function main() {
       status: "waiting_approval",
       attempts: 0,
       maxAttempts: 3,
-      createdAt: now,
-      updatedAt: now,
     },
   ];
 
-  await posts.insertMany(docs);
+  check(await supabase.from("posts").insert(docs.map(toRow)), "Seeding posts");
   console.log(`Seeded ${docs.length} posts`);
-
-  await client.close();
 }
 
 main().catch((err) => {

@@ -50,6 +50,14 @@ export function formatDayMonthTime(date: string, time: string): string {
   return `${formatDayMonth(date)}, ${time}`;
 }
 
+/** "as soon as you approve" for post-now drafts, otherwise "4 Nov, 09:00". */
+export function goesOutLabel(post: { postNow?: boolean; status: string; date: string; time: string }): string {
+  if (post.postNow && (post.status === "processing" || post.status === "waiting_approval")) {
+    return "as soon as you approve";
+  }
+  return formatDayMonthTime(post.date, post.time);
+}
+
 export function formatDayMonthYear(date: string): string {
   const d = toDate(date);
   return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`;

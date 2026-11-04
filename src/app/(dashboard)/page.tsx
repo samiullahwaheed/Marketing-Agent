@@ -1,6 +1,6 @@
 import { Clock, Lightbulb, Plus, TriangleAlert, Unlink } from "lucide-react";
 import Link from "next/link";
-import { getHomeData, getAccounts, getSettings, postsCollection } from "@/lib/db";
+import { countPosts, getHomeData, getAccounts, getSettings } from "@/lib/db";
 import { todayLong, formatDayMonth, shortDay } from "@/lib/format";
 import { PLATFORMS } from "@/lib/platforms";
 import { postLink } from "@/lib/status";
@@ -43,10 +43,9 @@ export default async function HomePage() {
   const reconnectAccounts = accounts.filter((a) => a.status === "reconnect");
   let blockedCount = 0;
   if (reconnectAccounts.length > 0) {
-    const col = await postsCollection();
-    blockedCount = await col.countDocuments({
-      status: { $in: ["waiting_approval", "scheduled"] },
-      platforms: { $in: reconnectAccounts.map((a) => a.platform) },
+    blockedCount = await countPosts({
+      status: ["waiting_approval", "scheduled"],
+      platforms: reconnectAccounts.map((a) => a.platform),
     });
   }
   const creditsLow = settings.aiCreditsPercent <= 20;

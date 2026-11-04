@@ -8,7 +8,7 @@ import {
   updatePlatformContentAction,
   updatePostImageAction,
 } from "@/lib/actions";
-import { formatDayMonthTime } from "@/lib/format";
+import { goesOutLabel } from "@/lib/format";
 import { paragraphs } from "@/lib/highlight";
 import { PLATFORMS, formatCharLimit } from "@/lib/platforms";
 import { inputClass } from "@/lib/ui";
@@ -93,7 +93,7 @@ export default function ReviewView({ post, accounts }: { post: Post; accounts: A
         </span>
         <h1 className="heading text-[32px] sm:text-[38px] leading-[1.08]">{post.topic}</h1>
         <p className="m-0 text-muted text-base">
-          Goes out <strong className="text-ink">{formatDayMonthTime(post.date, post.time)}</strong>
+          Goes out <strong className="text-ink">{goesOutLabel(post)}</strong>
         </p>
       </header>
 
@@ -138,7 +138,7 @@ export default function ReviewView({ post, accounts }: { post: Post; accounts: A
               <PlatformBadge platform={active} size="md" />
               <div>
                 <div className="font-bold text-[14.5px]">{PLATFORMS[active].label} preview</div>
-                <div className="text-muted text-[12.5px]">{formatDayMonthTime(post.date, post.time)}</div>
+                <div className="text-muted text-[12.5px]">{goesOutLabel(post)}</div>
               </div>
             </div>
             {editing ? (

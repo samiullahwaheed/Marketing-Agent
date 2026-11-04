@@ -1,17 +1,22 @@
-import type { Platform, PlatformContent } from "./types";
+import type { ImageUploadTarget } from "./supabase";
+import type { Platform, PlatformContent, RewriteRequest } from "./types";
 
 export interface CreatePostWebhookPayload {
   postId: string;
   topic: string;
   date: string;
   time: string;
-  scheduledAt: string;
+  /** ISO time to publish at, or null to publish as soon as it is approved. */
+  scheduledAt: string | null;
+  postNow: boolean;
   platforms: Platform[];
   imageMode: "ai" | "upload";
+  /** Existing public image (user upload, or the image kept from a previous draft). */
   imageUrl?: string;
   imagePrompt?: string;
+  /** Where n8n should PUT a freshly generated AI image. Only sent when one is needed. */
+  imageUpload?: ImageUploadTarget;
   audience?: string;
-  goal?: string;
   language?: string;
   brandVoice?: {
     tone: string;
@@ -19,7 +24,9 @@ export interface CreatePostWebhookPayload {
     sampleText: string;
     doNots: string;
   };
+  bannedWords?: string[];
   rewrite?: boolean;
+  rewriteRequest?: RewriteRequest;
   currentContent?: Partial<Record<Platform, PlatformContent>>;
   callbackUrl: string;
 }
@@ -29,6 +36,7 @@ export interface PublishPostWebhookPayload {
   topic: string;
   date: string;
   time: string;
+  /** ISO time to publish at. Now (or in the past) means publish immediately. */
   scheduledAt: string;
   platforms: Platform[];
   content: Partial<Record<Platform, PlatformContent>>;

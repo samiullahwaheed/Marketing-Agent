@@ -4,7 +4,7 @@ import { CircleAlert, LoaderCircle, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { retryPostAction } from "@/lib/actions";
-import { formatDayMonth, formatDayMonthTime, relativeDays } from "@/lib/format";
+import { formatDayMonth, formatDayMonthTime, goesOutLabel, relativeDays } from "@/lib/format";
 import { PLATFORMS } from "@/lib/platforms";
 import { APPROVALS_TABS, approvalsTab, approvalsTabLabel, postLink, type ApprovalsTab } from "@/lib/status";
 import type { Platform, Post } from "@/lib/types";
@@ -43,7 +43,8 @@ function WaitingCard({ post }: { post: Post }) {
             <PlatformBadge key={p} platform={p} />
           ))}
           <span>
-            Goes out {formatDayMonthTime(post.date, post.time)} · {relativeDays(post.date, post.time)}
+            Goes out {goesOutLabel(post)}
+            {!post.postNow && ` · ${relativeDays(post.date, post.time)}`}
           </span>
         </div>
         {excerpt && <p className="m-0 text-nav max-w-[620px] line-clamp-2">{excerpt}</p>}

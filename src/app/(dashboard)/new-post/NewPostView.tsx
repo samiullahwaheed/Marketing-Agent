@@ -14,12 +14,11 @@ import { PageHeader } from "@/components/PageHeader";
 import { Pill } from "@/components/Pill";
 import { PostImage } from "@/components/PostImage";
 
-const GOALS = [
-  { id: "seen", label: "Get seen", hint: "More views" },
-  { id: "leads", label: "Get leads", hint: "Calls, DMs, sign-ups" },
-  { id: "chat", label: "Start a chat", hint: "Comments & replies" },
-];
 const LANGUAGES = ["English", "اردو", "Roman Urdu", "English + Urdu mix"];
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const localDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const localTime = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 function Step({ n, title }: { n: number; title: string }) {
   return (
@@ -88,7 +87,6 @@ export default function NewPostView({ accounts, defaultTopic = "" }: { accounts:
   const accountByPlatform = useMemo(() => Object.fromEntries(accounts.map((a) => [a.platform, a])), [accounts]);
 
   const [topic, setTopic] = useState(defaultTopic);
-  const [goal, setGoal] = useState("leads");
   const [audience, setAudience] = useState(audiences.audiences.find((a) => a.status === "default")?.name ?? "");
   const [language, setLanguage] = useState(LANGUAGES[0]);
   const [imageMode, setImageMode] = useState<"ai" | "upload">("ai");
@@ -98,12 +96,24 @@ export default function NewPostView({ accounts, defaultTopic = "" }: { accounts:
   const [selected, setSelected] = useState<Set<Platform>>(
     () => new Set(PLATFORM_ORDER.filter((p) => accountByPlatform[p]?.status !== "not_connected").slice(0, 2))
   );
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [postNow, setPostNow] = useState(true);
+  const [date, setDate] = useState(() => localDate(new Date()));
   const [time, setTime] = useState("09:00");
   const scheduledAt = useMemo(() => {
-    const localDate = new Date(`${date}T${time}`);
-    return Number.isNaN(localDate.getTime()) ? "" : localDate.toISOString();
+    const at = new Date(`${date}T${time}`);
+    return Number.isNaN(at.getTime()) ? "" : at.toISOString();
   }, [date, time]);
+
+  // "Post now" stamps the post with the moment it was submitted, in the author's local time.
+  async function submit(formData: FormData) {
+    if (postNow) {
+      const now = new Date();
+      formData.set("date", localDate(now));
+      formData.set("time", localTime(now));
+      formData.delete("scheduledAt");
+    }
+    await createPostAction(formData);
+  }
 
   function toggle(p: Platform) {
     setSelected((prev) => {
@@ -114,15 +124,15 @@ export default function NewPostView({ accounts, defaultTopic = "" }: { accounts:
     });
   }
 
-  const canSubmit = topic.trim().length > 0 && selected.size > 0 && !fileError;
+  const canSubmit = topic.trim().length > 0 && selected.size > 0 && !fileError && (postNow || Boolean(scheduledAt));
   const audienceOptions = audiences.audiences.filter((a) => a.status !== "suggested");
 
   return (
-    <form action={createPostAction} className="flex flex-col gap-6 max-w-[1120px] mx-auto">
+    <form action={submit} className="flex flex-col gap-6 max-w-[1120px] mx-auto">
       <input type="hidden" name="audience" value={audience} />
-      <input type="hidden" name="goal" value={goal} />
       <input type="hidden" name="language" value={language} />
-      <input type="hidden" name="scheduledAt" value={scheduledAt} />
+      <input type="hidden" name="postNow" value={postNow ? "1" : "0"} />
+      {!postNow && <input type="hidden" name="scheduledAt" value={scheduledAt} />}
       <PageHeader
         title="New post"
         subtitle={
@@ -148,17 +158,6 @@ export default function NewPostView({ accounts, defaultTopic = "" }: { accounts:
               />
               <span className={hintClass}>A sentence is enough. Add a real example if you have one, and the agent will use it.</span>
             </label>
-            <fieldset className="border-0 m-0 p-0 flex flex-col gap-2">
-              <legend className="font-bold text-[14.5px] p-0 mb-2">What should this post do?</legend>
-              <div className="flex flex-wrap gap-2.5">
-                {GOALS.map((g) => (
-                  <Segment key={g.id} on={goal === g.id} onClick={() => setGoal(g.id)}>
-                    {g.label}
-                    <span className={`block font-normal text-[13px] ${goal === g.id ? "text-primary" : "text-muted"}`}>{g.hint}</span>
-                  </Segment>
-                ))}
-              </div>
-            </fieldset>
             <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))]">
               <label className={labelClass}>
                 Who is it for?
@@ -286,7 +285,9 @@ export default function NewPostView({ accounts, defaultTopic = "" }: { accounts:
                   <div key={platform} className="flex flex-col gap-2.5 px-3.5 py-3 border border-[#E3BDB7] bg-[#FDF6F5] rounded-xl">
                     {checkbox}
                     <div className="flex flex-wrap gap-2.5 items-center justify-between text-[13.5px] text-error">
-                      <span>Reconnect before {date} or the {p.label} version won&apos;t post.</span>
+                      <span>
+                        Reconnect {postNow ? "before you approve" : `before ${date}`} or the {p.label} version won&apos;t post.
+                      </span>
                       <Button to="/settings" className="min-h-[38px]">
                         Reconnect
                       </Button>
@@ -307,16 +308,31 @@ export default function NewPostView({ accounts, defaultTopic = "" }: { accounts:
               );
             })}
           </div>
-          <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(min(150px,100%),1fr))]">
-            <label className={labelClass}>
-              Date
-              <input className={inputClass} type="date" name="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-            </label>
-            <label className={labelClass}>
-              Time
-              <input className={inputClass} type="time" name="time" value={time} onChange={(e) => setTime(e.target.value)} required />
-            </label>
-          </div>
+          <fieldset className="border-0 m-0 p-0 flex flex-col gap-3">
+            <legend className="font-bold text-[14.5px] p-0 mb-2">When</legend>
+            <div className="flex flex-wrap gap-2.5">
+              <Segment on={postNow} onClick={() => setPostNow(true)}>
+                Post now
+                <span className={`block font-normal text-[13px] ${postNow ? "text-primary" : "text-muted"}`}>As soon as you approve</span>
+              </Segment>
+              <Segment on={!postNow} onClick={() => setPostNow(false)}>
+                Schedule
+                <span className={`block font-normal text-[13px] ${!postNow ? "text-primary" : "text-muted"}`}>Pick a date and time</span>
+              </Segment>
+            </div>
+            {!postNow && (
+              <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(min(150px,100%),1fr))]">
+                <label className={labelClass}>
+                  Date
+                  <input className={inputClass} type="date" name="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                </label>
+                <label className={labelClass}>
+                  Time
+                  <input className={inputClass} type="time" name="time" value={time} onChange={(e) => setTime(e.target.value)} required />
+                </label>
+              </div>
+            )}
+          </fieldset>
           <SubmitButton disabled={!canSubmit} />
           <p className={`${hintClass} -mt-2 mb-0 text-center`}>Takes about a minute. You&apos;ll find it in Approvals. Uses 1 AI credit.</p>
         </Card>

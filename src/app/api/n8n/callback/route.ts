@@ -1,26 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ObjectId } from "mongodb";
-import { postsCollection } from "@/lib/db";
+import { getPostById, updatePost } from "@/lib/db";
+import { getSupabase } from "@/lib/supabase";
 import type { Platform, PlatformContent, PlatformResult, PostStatus } from "@/lib/types";
 
-// Called by the n8n workflow once it has generated per-platform content and
-// uploaded the image to Google Drive. Protect with the shared secret so this
-// public endpoint can't be used to overwrite arbitrary posts.
+// Called by the n8n workflow (1) once it has generated per-platform content
+// and stored the image in Supabase Storage, and (2) once per platform after
+// publishing. Protect with the shared secret so this public endpoint can't be
+// used to overwrite arbitrary posts.
 //
-// Expected JSON body:
+// Header: x-callback-secret: <N8N_CALLBACK_SECRET>
+//
+// Generation callback:
 // {
-//   "postId": "<mongo _id of the post>",
-//   "imageUrl": "https://drive.google.com/...",
+//   "postId": "<uuid of the post>",
+//   "imageUrl": "https://<project>.supabase.co/storage/v1/object/public/post-images/...",
 //   "content": {
 //     "linkedin": { "text": "...", "hashtags": ["automation", "n8n"], "suggestedHashtags": ["nocode"] },
 //     "x": { "text": "...", "hashtags": [...] }
 //   },
 //   "warnings": ["\"11 hours\" has no source — check before posting"],
-//   "status": "waiting_approval", // optional for generation callbacks
-//   "platformResults": { "linkedin": { "status": "published", "url": "..." } }
+//   "status": "waiting_approval",          // or "failed" together with "error"
+//   "error": "Claude returned no text for x"
 // }
+//
+// Publish callback:
+// { "postId": "<uuid>", "platformResults": { "linkedin": { "status": "published", "url": "..." } } }
+const STATUSES: PostStatus[] = ["processing", "waiting_approval", "scheduled", "published", "failed", "rejected"];
+const RESULT_STATUSES: PlatformResult["status"][] = ["not_sent", "scheduled", "published", "failed"];
+
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get("x-callback-secret");
+  const secret = req.headers.get("x-callback-secret") ?? req.headers.get("x-api-key");
   if (!process.env.N8N_CALLBACK_SECRET || secret !== process.env.N8N_CALLBACK_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -41,74 +50,47 @@ export async function POST(req: NextRequest) {
   }
 
   const { postId, imageUrl, content, warnings, status, error, platformResults } = body;
-  if (!postId || !ObjectId.isValid(postId)) {
-    return NextResponse.json({ error: "Missing or invalid postId" }, { status: 400 });
+  if (!postId) {
+    return NextResponse.json({ error: "Missing postId" }, { status: 400 });
   }
-  if (status && !["processing", "waiting_approval", "scheduled", "published", "failed", "rejected"].includes(status)) {
+  if (status && !STATUSES.includes(status)) {
     return NextResponse.json({ error: "Invalid post status" }, { status: 400 });
   }
 
-  const col = await postsCollection();
-  const existing = await col.findOne({ _id: new ObjectId(postId) });
+  const existing = await getPostById(postId);
   if (!existing) {
     return NextResponse.json({ error: "Post not found" }, { status: 404 });
   }
 
-  if (
-    platformResults &&
-    Object.entries(platformResults).some(
-      ([platform, result]) =>
-        !existing.platforms.some((knownPlatform) => knownPlatform === platform) ||
-        !result ||
-        !["not_sent", "scheduled", "published", "failed"].includes(result.status)
-    )
-  ) {
-    return NextResponse.json({ error: "Unknown platform in publish results" }, { status: 400 });
+  if (platformResults) {
+    if (
+      Object.entries(platformResults).some(
+        ([platform, result]) =>
+          !existing.platforms.includes(platform as Platform) || !result || !RESULT_STATUSES.includes(result.status)
+      )
+    ) {
+      return NextResponse.json({ error: "Unknown platform in publish results" }, { status: 400 });
+    }
+
+    // Atomic merge + final status, see supabase/schema.sql.
+    const { error: rpcError } = await getSupabase().rpc("apply_publish_results", {
+      p_id: postId,
+      p_results: platformResults,
+    });
+    if (rpcError) {
+      return NextResponse.json({ error: rpcError.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
   }
 
-  const platformError = Object.values(platformResults ?? {}).find(
-    (result) => result?.status === "failed" && result.error
-  )?.error;
-  const setFields: Record<string, unknown> = {
+  const nextStatus: PostStatus = status ?? (error ? "failed" : "waiting_approval");
+  await updatePost(postId, {
     ...(imageUrl ? { imageUrl } : {}),
     ...(content ? { content: { ...existing.content, ...content } } : {}),
     ...(warnings ? { warnings } : {}),
-    ...(status ? { status } : !platformResults ? { status: "waiting_approval" } : {}),
-    ...(error || platformError ? { lastError: error || platformError } : {}),
-    updatedAt: new Date(),
-  };
-  for (const [platform, result] of Object.entries(platformResults ?? {})) {
-    if (result) setFields[`results.${platform}`] = result;
-  }
-
-  await col.updateOne(
-    { _id: new ObjectId(postId) },
-    {
-      $set: setFields,
-      ...(!error && !platformError && !platformResults ? { $unset: { lastError: "" } } : {}),
-    }
-  );
-
-  if (platformResults) {
-    const updated = await col.findOne({ _id: new ObjectId(postId) });
-    if (updated) {
-      const allResolved = existing.platforms.every((platform) =>
-        ["published", "failed"].includes(updated.results?.[platform]?.status ?? "")
-      );
-      if (allResolved) {
-        const allPublished = existing.platforms.every(
-          (platform) => updated.results?.[platform]?.status === "published"
-        );
-        await col.updateOne(
-          { _id: new ObjectId(postId) },
-          {
-            $set: { status: allPublished ? "published" : "failed", updatedAt: new Date() },
-            ...(allPublished ? { $unset: { lastError: "" } } : {}),
-          }
-        );
-      }
-    }
-  }
+    status: nextStatus,
+    lastError: error || (nextStatus === "failed" ? existing.lastError : null),
+  });
 
   return NextResponse.json({ ok: true });
 }

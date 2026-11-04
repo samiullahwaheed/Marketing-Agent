@@ -34,7 +34,12 @@ export default function RewriteView({ post }: { post: Post }) {
     setWorking(true);
     setError(null);
     try {
-      await requestRewriteAction(post.id);
+      await requestRewriteAction(post.id, {
+        instructions: ask.trim() || undefined,
+        options: selected,
+        platforms,
+        keepHashtags,
+      });
       setRequested(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Rewrite request failed");

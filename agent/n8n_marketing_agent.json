@@ -1,40 +1,124 @@
 {
-  "name": "Social Media Agent - Complete Dashboard Flow (fixed)",
+  "name": "Social Media Agent - Dashboard Flow (Supabase + Claude)",
   "nodes": [
+    {
+      "parameters": {
+        "content": "## Setup after import\n\n**Credentials to select**\n- **Header Auth account** (webhooks + callbacks). Header name `x-api-key`, value = `N8N_WEBHOOK_API_KEY`. Set `N8N_CALLBACK_SECRET` in the dashboard to the same value.\n- **Anthropic account**: 3 Claude nodes\n- **OpenAI account**: *Generate Image* (Claude has no image output, so Claude writes the prompt and OpenAI renders it)\n- **LinkedIn account**, **X account**\n- **Facebook Graph account**: a **Page** access token with `pages_manage_posts`, `pages_read_engagement`, `instagram_basic`, `instagram_content_publish`\n\n**IDs to set** in *Normalize Publish Request*\n- `facebookPageId`\n- `instagramAccountId`: the Instagram *Business* Account ID, **not** the Page ID (`GET /{page-id}?fields=instagram_business_account`)\n\n**Storage**: no credential needed. The dashboard sends a one-off Supabase signed upload URL with each request.",
+        "height": 700,
+        "width": 460,
+        "color": 6
+      },
+      "id": "eac6cf9c-90c9-5563-af3d-a172c99ee020",
+      "name": "Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 1. Create / rewrite post\nDashboard → validate → Claude writes one post per platform → Claude writes image prompt → OpenAI renders JPEG → upload to Supabase Storage → callback to dashboard (waiting_approval or failed)",
+        "height": 120,
+        "width": 3260,
+        "color": 4
+      },
+      "id": "4266a5de-ef14-563c-b3b6-d31a5556bd8d",
+      "name": "Create Flow Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. Publish approved post\nDashboard (approve / retry) → validate → wait until scheduled time (or post now) → publish per platform → callback with each platform's result",
+        "height": 120,
+        "width": 3260,
+        "color": 5
+      },
+      "id": "91461664-37c8-58d3-9453-afdf923cc780",
+      "name": "Publish Flow Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        720
+      ]
+    },
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "social-post-create",
         "authentication": "headerAuth",
+        "responseMode": "responseNode",
         "options": {}
       },
-      "id": "d4e0f3ec-bb6e-42c7-987e-4e7ee4628861",
+      "id": "abd9bfe6-1ae2-5d19-9ca0-191b934d4f1c",
       "name": "Create Post Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
         0,
-        96
+        0
       ],
-      "webhookId": "fc04d4a8-28de-40a5-958d-95d1b5b09ff4",
       "credentials": {
         "httpHeaderAuth": {
           "id": "4PEJf48hGSqtz6Fi",
           "name": "Header Auth account"
         }
-      }
+      },
+      "webhookId": "fc04d4a8-28de-40a5-958d-95d1b5b09ff4"
     },
     {
       "parameters": {
-        "jsCode": "const b=$json.body ?? $json;\nconst platforms=['linkedin','x','instagram','facebook'];\nif(!b.postId || !b.topic || !Array.isArray(b.platforms) || !b.platforms.length || !b.callbackUrl)\n  throw new Error('postId, topic, platforms and callbackUrl are required');\nif(b.platforms.some(p=>!platforms.includes(p))) throw new Error('Unsupported platform in request');\nreturn [{json:{\n postId:String(b.postId), jobId:String(b.postId), topic:b.topic, date:b.date, time:b.time,\n scheduledAt:b.scheduledAt ?? null, platforms:b.platforms,\n uploadedImageUrl:b.imageUrl ?? null, imageMode:b.imageMode ?? 'ai',\n imagePrompt:b.imagePrompt ?? '', audience:b.audience ?? '', goal:b.goal ?? '', language:b.language ?? '',\n brandVoice:b.brandVoice ?? {}, rewrite:Boolean(b.rewrite), currentContent:b.currentContent ?? null,\n callbackUrl:b.callbackUrl, status:'generating'\n}}];"
+        "jsCode": "const b = $json.body ?? $json;\nconst allowed = ['linkedin', 'x', 'instagram', 'facebook'];\nif (!b.postId || !b.topic || !Array.isArray(b.platforms) || !b.platforms.length || !b.callbackUrl)\n  throw new Error('postId, topic, platforms and callbackUrl are required');\nif (b.platforms.some(p => !allowed.includes(p))) throw new Error('Unsupported platform in request');\n\nreturn [{ json: {\n  postId: String(b.postId),\n  topic: String(b.topic),\n  date: b.date ?? '',\n  time: b.time ?? '',\n  scheduledAt: b.scheduledAt ?? null,\n  postNow: Boolean(b.postNow),\n  platforms: b.platforms,\n  imageMode: b.imageMode ?? 'ai',\n  uploadedImageUrl: b.imageUrl ?? null,   // user upload, or image kept from the previous draft\n  imagePrompt: b.imagePrompt ?? '',\n  imageUpload: b.imageUpload ?? null,     // { signedUrl, publicUrl, path } for a new AI image\n  audience: b.audience ?? '',\n  language: b.language ?? '',\n  brandVoice: b.brandVoice ?? {},\n  bannedWords: Array.isArray(b.bannedWords) ? b.bannedWords : [],\n  rewrite: Boolean(b.rewrite),\n  rewriteRequest: b.rewriteRequest ?? null,\n  currentContent: b.currentContent ?? null,\n  callbackUrl: b.callbackUrl,\n} }];"
       },
-      "id": "b4736904-93e2-4631-9217-5872913b7c7e",
+      "id": "90d6c10b-da4b-58b9-85fe-0d193c6b63c7",
       "name": "Normalize Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        480,
-        320
+        220,
+        0
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, postId: $json.postId } }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "08eb7e9e-8426-5c43-8b19-4b46aab34e06",
+      "name": "Accept Create Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, error: $json.error?.message ?? $json.error ?? 'Invalid request' } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "4a9f1dda-72e3-537f-bc98-6fc0bb97a5ff",
+      "name": "Reject Create Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        120
       ]
     },
     {
@@ -45,128 +129,119 @@
           "destinationFieldName": "platform"
         }
       },
-      "id": "801e8cdf-9b71-4bbf-995e-2f5ba5021fa3",
+      "id": "8a86cdc5-efb5-5e56-9c00-9948e6551ec3",
       "name": "Split Platforms",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
       "position": [
-        704,
-        320
+        660,
+        -100
       ]
     },
     {
       "parameters": {
-        "jsCode": "const rules={\nlinkedin:{maxCharacters:3000,style:'professional'},\nx:{maxCharacters:280,style:'concise'},\ninstagram:{maxCharacters:2200,style:'visual and engaging'},\nfacebook:{maxCharacters:63206,style:'conversational'}\n};\nreturn [{json:{...$json,platformRules:rules[$json.platform]??{style:'social'}}}];"
+        "jsCode": "const rules = {\n  linkedin: { maxCharacters: 3000, style: 'professional, first-person, short paragraphs, a question at the end' },\n  x: { maxCharacters: 280, style: 'concise and punchy, one idea' },\n  instagram: { maxCharacters: 2200, style: 'visual and engaging, line breaks, caption for an image' },\n  facebook: { maxCharacters: 63206, style: 'conversational and warm' },\n};\nreturn [{ json: { ...$json, platformRules: rules[$json.platform] ?? { maxCharacters: 2000, style: 'social' } } }];"
       },
-      "id": "f0cd736d-dfad-475b-a402-b2ec93f49e9c",
+      "id": "f8ca4996-3e8e-5ae3-8174-8ef2f27d8de3",
       "name": "Platform Rules",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        928,
-        320
+        880,
+        -100
       ]
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=Write a {{ $json.platform }} post.\nTopic: {{ $json.topic }}\nAudience: {{ $json.audience || 'general' }}\nGoal: {{ $json.goal || 'engagement' }}\nLanguage: {{ $json.language || 'English' }}\nBrand voice: {{ JSON.stringify($json.brandVoice || {}) }}\nStyle: {{ $json.platformRules.style }}\nMaximum length: {{ $json.platformRules.maxCharacters }} characters including hashtags.\nPlanned date/time: {{ $json.date || '' }} {{ $json.time || '' }}\n{{ $json.rewrite && $json.currentContent ? 'Rewrite and improve this existing draft: ' + JSON.stringify($json.currentContent[$json.platform] ?? $json.currentContent) : '' }}",
+        "text": "=Write a {{ $json.platform }} post.\nTopic: {{ $json.topic }}\nAudience: {{ $json.audience || 'general' }}\nLanguage: {{ $json.language || 'English' }}\nBrand voice: {{ JSON.stringify($json.brandVoice || {}) }}\nNever use these words: {{ ($json.bannedWords || []).join(', ') || 'none' }}\nStyle: {{ $json.platformRules.style }}\nMaximum length: {{ $json.platformRules.maxCharacters }} characters including hashtags.\n{{ $json.rewrite ? 'This is a REWRITE. Current draft: ' + JSON.stringify(($json.currentContent || {})[$json.platform] || {}) + '\\nRequested changes: ' + ([...($json.rewriteRequest?.options || []), $json.rewriteRequest?.instructions].filter(Boolean).join('; ') || 'make it better') + ($json.rewriteRequest?.keepHashtags ? '\\nKeep the same hashtags.' : '') : '' }}",
         "hasOutputParser": true,
         "needsFallback": true,
         "messages": {
           "messageValues": [
             {
-              "message": "You are an expert social media copywriter. Write ready-to-publish copy tailored to the requested platform, its tone and its character limit. Put the post body in \"text\" WITHOUT hashtags; put 3-8 relevant hashtags in \"hashtags\" and extra optional ones in \"suggestedHashtags\". Add short notes to \"warnings\" for any claim, statistic or date the user should double-check; otherwise return an empty array."
+              "message": "You are an expert social media copywriter. Write ready-to-publish copy tailored to the requested platform, its tone and its character limit. Put the post body in \"text\" WITHOUT hashtags; put 3-8 relevant hashtags (no # sign) in \"hashtags\" and extra optional ones in \"suggestedHashtags\". Add short notes to \"warnings\" for any claim, statistic or date the user should double-check; otherwise return an empty array. Never invent facts about the user's business."
             }
           ]
         },
         "batching": {}
       },
-      "id": "705b993a-f3da-4f3b-8471-c577ec92b047",
+      "id": "1f1657c1-2cbb-51b6-8f6f-2f39866cdf35",
       "name": "Write Platform Post",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.9,
       "position": [
-        1424,
-        512
+        1100,
+        -100
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-sonnet-5-5"
+        },
+        "options": {
+          "maxTokensToSample": 2048,
+          "temperature": 0.7
+        }
+      },
+      "id": "e33c0431-44d4-58bc-96ac-452a7078b68d",
+      "name": "Claude Sonnet (Post Writer)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1040,
+        140
       ]
     },
     {
       "parameters": {
         "model": {
           "__rl": true,
-          "mode": "list",
-          "value": "gpt-5-mini"
+          "mode": "id",
+          "value": "claude-haiku-5-5"
         },
-        "builtInTools": {},
-        "options": {}
+        "options": {
+          "maxTokensToSample": 2048,
+          "temperature": 0.7
+        }
       },
-      "id": "19589d27-86a0-4e91-bc5c-5cc53b6225fe",
-      "name": "OpenAI Chat Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "id": "b9dda548-dbc5-544b-8c77-875e8a9c7cc5",
+      "name": "Claude Haiku (Fallback)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
       "typeVersion": 1.3,
       "position": [
-        2016,
-        192
-      ],
-      "credentials": {
-        "openAiApi": {
-          "id": null,
-          "name": "",
-          "__aiGatewayManaged": true
-        }
-      }
+        1180,
+        140
+      ]
     },
     {
       "parameters": {
-        "model": {
-          "__rl": true,
-          "mode": "list",
-          "value": "gpt-5-mini"
-        },
-        "builtInTools": {},
-        "options": {}
+        "jsonSchemaExample": "{\"text\": \"Post body here\", \"hashtags\": [\"marketing\"], \"suggestedHashtags\": [\"growth\"], \"warnings\": [\"Verify the statistic quoted\"]}"
       },
-      "id": "133c179f-6a0c-4119-a615-7af20c325de4",
-      "name": "OpenAI Chat Model1",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1.3,
-      "position": [
-        1136,
-        336
-      ],
-      "credentials": {
-        "openAiApi": {
-          "id": null,
-          "name": "",
-          "__aiGatewayManaged": true
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsonSchemaExample": "{\"text\":\"Post body here\",\"hashtags\":[\"#marketing\"],\"suggestedHashtags\":[\"#growth\"],\"warnings\":[\"Verify the statistic quoted\"]}"
-      },
-      "id": "2da61c09-6fa3-474b-867d-a4c6fa7d8bea",
+      "id": "b14f015a-4cc5-56de-8cb4-672f34fb598e",
       "name": "Post Format",
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        1616,
-        736
+        1320,
+        140
       ]
     },
     {
       "parameters": {
-        "jsCode": "const generated=$input.all();\nconst bases=$('Platform Rules').all();\nconst content={};\nconst warnings=[];\nfor(let i=0;i<generated.length;i++){\n const base=bases[i]?.json;\n const result=generated[i].json;\n const raw=result.output ?? result.content ?? result;\n const text=typeof raw==='string' ? raw : raw.text ?? raw.output ?? raw.post ?? result.text ?? result.output ?? result.post ?? result.message ?? '';\n if(!text) throw new Error('Content agent returned no text for '+base.platform);\n content[base.platform]={text:String(text),hashtags:Array.isArray(raw.hashtags)?raw.hashtags:(Array.isArray(result.hashtags)?result.hashtags:[]),suggestedHashtags:Array.isArray(raw.suggestedHashtags)?raw.suggestedHashtags:(Array.isArray(result.suggestedHashtags)?result.suggestedHashtags:[])};\n const itemWarnings=raw.warnings ?? result.warnings ?? result.flags ?? [];\n warnings.push(...(Array.isArray(itemWarnings)?itemWarnings:[String(itemWarnings)]));\n}\nconst base=bases[0].json;\nreturn [{json:{...base,platform:undefined,platforms:bases.map(item=>item.json.platform),content,warnings,hasUserImage:Boolean(base.uploadedImageUrl)}}];"
+        "jsCode": "const generated = $input.all();\nconst bases = $('Platform Rules').all();\nconst req = $('Normalize Request').first().json;\nconst current = req.currentContent || {};\nconst clean = list => (Array.isArray(list) ? list : []).map(h => String(h).replace(/^#/, '').trim()).filter(Boolean);\n\nconst content = {};\nconst warnings = [];\nconst errors = [];\nfor (let i = 0; i < bases.length; i++) {\n  const platform = bases[i].json.platform;\n  const res = generated[i]?.json ?? {};\n  const raw = res.output ?? res;\n  const text = typeof raw === 'string' ? raw : (raw.text ?? '');\n  if (res.error || !text) {\n    errors.push(platform + ': ' + (res.error?.message ?? res.error ?? 'Claude returned no text'));\n    continue;\n  }\n  const keepTags = req.rewrite && req.rewriteRequest?.keepHashtags && clean(current[platform]?.hashtags).length;\n  content[platform] = {\n    text: String(text).trim(),\n    hashtags: keepTags ? clean(current[platform].hashtags) : clean(raw.hashtags),\n    suggestedHashtags: clean(raw.suggestedHashtags),\n  };\n  if (Array.isArray(raw.warnings)) warnings.push(...raw.warnings.map(String));\n}\n\nconst failed = Object.keys(content).length === 0;\nif (!failed) warnings.push(...errors.map(e => 'Could not write the ' + e));\nreturn [{ json: { ...req, content, warnings, failed, error: failed ? errors.join('; ') : null } }];"
       },
-      "id": "1ed698be-fb72-474c-ab71-2fe0ed91ca94",
+      "id": "e4b563fa-b9b1-5985-80e0-1bc6ddf89129",
       "name": "Aggregate Generated Content",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1360,
-        320
+        1500,
+        -100
       ]
     },
     {
@@ -180,8 +255,8 @@
           },
           "conditions": [
             {
-              "id": "04dd4cfb-1725-4da9-93d2-1d64677c04ed",
-              "leftValue": "={{ $json.hasUserImage }}",
+              "id": "a9dc6618-3d55-5e7c-ab7a-654932480997",
+              "leftValue": "={{ !$json.failed && $json.imageMode === 'ai' && !$json.uploadedImageUrl && Boolean($json.imageUpload?.signedUrl) }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -194,122 +269,162 @@
         },
         "options": {}
       },
-      "id": "f638bd9f-c5e0-4035-88b7-5f6efc61afaf",
-      "name": "User Image?",
+      "id": "498a0ae9-aa17-5993-8e1b-23eff8f53110",
+      "name": "Needs AI Image?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        2752,
-        336
+        1720,
+        -100
       ]
     },
     {
       "parameters": {
-        "jsCode": "return [{json:{...$json,imageUrl:$json.uploadedImageUrl,imageSource:'user'}}];"
-      },
-      "id": "de80045a-3411-47be-97ea-c2be9f2292fd",
-      "name": "Use User Image",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2976,
-        208
-      ]
-    },
-    {
-      "parameters": {
-        "url": "={{ $json.imageUrl }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file"
+        "promptType": "define",
+        "text": "=Write one image-generation prompt for this social media post.\nTopic: {{ $json.topic }}\nAudience: {{ $json.audience || 'general' }}\nWhat the user wants in the picture: {{ $json.imagePrompt || 'not specified, choose something fitting' }}\nPost: {{ (Object.values($json.content || {})[0] || {}).text || '' }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are an art director. Reply with ONLY the image prompt, at most 90 words: subject, composition, style, colours and lighting. Square 1:1. No text, letters, numbers, logos or watermarks in the image."
             }
-          }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "a58288c9-243c-592a-8c99-7746553e30b7",
+      "name": "Write Image Prompt",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1940,
+        -220
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-sonnet-5-5"
+        },
+        "options": {
+          "maxTokensToSample": 400,
+          "temperature": 0.7
         }
       },
-      "id": "74f314ff-6f01-42ed-9839-60f3a8dc844c",
-      "name": "Download User Image",
+      "id": "66455615-e197-5de9-b254-2b5455040cd2",
+      "name": "Claude Sonnet (Image Prompt)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1940,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/generations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: 'gpt-image-1',\n  prompt: $json.text || $('Aggregate Generated Content').first().json.imagePrompt || ('Professional social media image, no text, about: ' + $('Aggregate Generated Content').first().json.topic),\n  size: '1024x1024',\n  quality: 'medium',\n  output_format: 'jpeg',\n  n: 1\n} }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "500e7280-d1f8-5e7a-947e-415031a7e015",
+      "name": "Generate Image",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2832,
-        528
+        2160,
+        -220
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "data[0].b64_json",
+        "options": {
+          "fileName": "post-image.jpg",
+          "mimeType": "image/jpeg"
+        }
+      },
+      "id": "af9dae62-2e72-5a06-8e67-0c40be526a4e",
+      "name": "Image to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        2380,
+        -220
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $('Aggregate Generated Content').first().json.imageUpload.signedUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "image/jpeg"
+            },
+            {
+              "name": "x-upsert",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "36fb2e4b-8517-516f-b278-bec6f527e475",
+      "name": "Upload Image to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2600,
+        -220
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('Aggregate Generated Content').first().json;\nconst genError = $('Generate Image').first().json.error;\nconst upError = $json.error;\nif (genError || upError) {\n  const msg = (genError ?? upError)?.message ?? String(genError ?? upError);\n  return [{ json: { ...base, imageUrl: null, warnings: [...base.warnings, 'AI image could not be created: ' + msg + '. Upload one on the review page.'] } }];\n}\nreturn [{ json: { ...base, imageUrl: base.imageUpload.publicUrl } }];"
+      },
+      "id": "c29ef45e-91b0-586c-8ef2-a1a0e2a88d4e",
+      "name": "Attach AI Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2820,
+        -220
       ]
     },
     {
       "parameters": {
-        "name": "=post-{{ $('Aggregate Generated Content').item.json.postId }}-{{ $now.toMillis() }}.png",
-        "driveId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "My Drive"
-        },
-        "folderId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "root",
-          "cachedResultName": "/ (Root folder)"
-        },
-        "options": {}
+        "jsCode": "return [{ json: { ...$json, imageUrl: $json.uploadedImageUrl ?? null } }];"
       },
-      "id": "47cfc230-e59c-49ab-9bd0-ddfae5bd0fbc",
-      "name": "Upload Image to Drive",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [
-        3184,
-        336
-      ],
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "cRxGs5Wv6bgSnKcJ",
-          "name": "Google Drive account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "share",
-        "fileId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "={{ $json.id }}"
-        },
-        "permissionsUi": {
-          "permissionsValues": {
-            "role": "reader",
-            "type": "anyone"
-          }
-        },
-        "options": {}
-      },
-      "id": "daf4ba47-6c58-49a9-95a0-453787238611",
-      "name": "Make Image Public",
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [
-        3280,
-        624
-      ],
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "cRxGs5Wv6bgSnKcJ",
-          "name": "Google Drive account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const base=$('Aggregate Generated Content').first().json;\nconst up=$('Upload Image to Drive').item.json;\nconst imageUrl=up.id ? 'https://drive.google.com/uc?export=download&id='+up.id : (base.uploadedImageUrl ?? null);\nreturn {json:{...base,imageUrl,imageSource:base.hasUserImage?'user':'generated',driveFileId:up.fileId ?? up.id ?? null,status:'waiting_approval'}};"
-      },
-      "id": "c05753dc-ab24-4098-a47a-db4490a5406f",
-      "name": "Merge Image",
+      "id": "afa2674e-e26e-54d1-822f-bd8bd4a84f32",
+      "name": "Keep Existing Image",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        3296,
-        496
+        1940,
+        260
       ]
     },
     {
@@ -320,102 +435,112 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ {postId:$json.postId,imageUrl:$json.imageUrl,content:$json.content,warnings:$json.warnings,status:'waiting_approval'} }}",
-        "options": {}
+        "jsonBody": "={{ {\n  postId: $json.postId,\n  imageUrl: $json.imageUrl || undefined,\n  content: $json.content,\n  warnings: $json.warnings,\n  status: $json.failed ? 'failed' : 'waiting_approval',\n  error: $json.error || undefined\n} }}",
+        "options": {
+          "timeout": 30000
+        }
       },
-      "id": "45667d48-3171-4996-be5c-7a4cf59431dd",
+      "id": "e0c82165-840d-5000-96cb-c6210cbb389a",
       "name": "Return Generated Content to Dashboard",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        3408,
-        336
+        3040,
+        -100
       ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "4PEJf48hGSqtz6Fi",
           "name": "Header Auth account"
         }
-      }
-    },
-    {
-      "parameters": {
-        "resource": "image",
-        "modelId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "gpt-image-2",
-          "cachedResultName": "GPT-IMAGE-2"
-        },
-        "prompt": "={{ $json.imagePrompt || ('Eye-catching, professional social media image (no text overlay) about: ' + $json.topic + ($json.audience ? '. Audience: ' + $json.audience : '')) }}",
-        "options": {
-          "quality": "medium",
-          "size": "1024x1024"
-        }
       },
-      "id": "fdcb9efa-4acf-4238-9f2f-3bebf38b99b6",
-      "name": "Generate Image",
-      "type": "@n8n/n8n-nodes-langchain.openAi",
-      "typeVersion": 2.3,
-      "position": [
-        2976,
-        448
-      ],
-      "credentials": {
-        "openAiApi": {
-          "id": null,
-          "name": "Gateway credits",
-          "__aiGatewayManaged": true
-        }
-      }
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
     },
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "social-post-publish",
         "authentication": "headerAuth",
+        "responseMode": "responseNode",
         "options": {}
       },
-      "id": "6ac3229f-767d-43ba-aa6c-3c958e1ec082",
+      "id": "e31eddd2-563b-5fe0-9abc-818f374d25ec",
       "name": "Publish Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        -16,
-        1888
+        0,
+        1100
       ],
-      "webhookId": "697dda25-ecac-461b-b1ba-4c232c83a358",
       "credentials": {
         "httpHeaderAuth": {
           "id": "4PEJf48hGSqtz6Fi",
           "name": "Header Auth account"
         }
-      }
+      },
+      "webhookId": "697dda25-ecac-461b-b1ba-4c232c83a358"
     },
     {
       "parameters": {
-        "jsCode": "const b=$json.body ?? $json;\nconst platforms=['linkedin','x','instagram','facebook'];\nif(!b.postId || !b.topic || !Array.isArray(b.platforms) || !b.platforms.length || !b.callbackUrl)\n throw new Error('postId, topic, platforms and callbackUrl are required');\nif(b.platforms.some(p=>!platforms.includes(p))) throw new Error('Unsupported platform in request');\nconst scheduledAt=b.scheduledAt ?? null;\nconst platformPosts=b.platforms.map(platform=>({postId:String(b.postId),jobId:String(b.postId),platform,topic:b.topic,date:b.date,time:b.time,scheduledAt,content:b.content?.[platform] ?? {text:'',hashtags:[]},imageUrl:b.imageUrl ?? null}));\nreturn [{json:{postId:String(b.postId),jobId:String(b.postId),topic:b.topic,date:b.date,time:b.time,scheduledAt,platforms:b.platforms,platformPosts,callbackUrl:b.callbackUrl}}];"
+        "jsCode": "// Your account IDs. Instagram needs the Instagram *Business* Account ID linked to the\n// Facebook Page (Graph API: GET /{page-id}?fields=instagram_business_account), not the Page ID.\nconst ACCOUNTS = {\n  facebookPageId: '1458689310655772',\n  instagramAccountId: 'REPLACE_WITH_INSTAGRAM_BUSINESS_ACCOUNT_ID',\n};\n\nconst b = $json.body ?? $json;\nconst allowed = ['linkedin', 'x', 'instagram', 'facebook'];\nif (!b.postId || !Array.isArray(b.platforms) || !b.platforms.length || !b.callbackUrl)\n  throw new Error('postId, platforms and callbackUrl are required');\nif (b.platforms.some(p => !allowed.includes(p))) throw new Error('Unsupported platform in request');\n\nconst withTags = c => {\n  const text = String(c?.text || '');\n  const tags = (Array.isArray(c?.hashtags) ? c.hashtags : [])\n    .map(h => '#' + String(h).replace(/^#/, ''))\n    .filter(h => !text.includes(h));\n  return tags.length ? text + '\\n\\n' + tags.join(' ') : text;\n};\n\nreturn [{ json: {\n  postId: String(b.postId),\n  scheduledAt: b.scheduledAt ?? null,\n  callbackUrl: b.callbackUrl,\n  platformPosts: b.platforms.map(platform => ({\n    platform,\n    message: withTags(b.content?.[platform]),\n    imageUrl: b.imageUrl ?? null,\n  })),\n  accounts: ACCOUNTS,\n} }];"
       },
-      "id": "529d4dfd-cd32-477e-8f8a-b18f86090c24",
+      "id": "f9f12465-14e8-51f3-ab70-8b9883c39a6c",
       "name": "Normalize Publish Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        384,
-        1120
+        220,
+        1100
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, postId: $json.postId } }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "ad39bce5-0ed4-5a81-b418-b7766a0c7ed6",
+      "name": "Accept Publish Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        1000
       ]
     },
     {
       "parameters": {
-        "jsCode": "const all=$json.platformPosts ?? [];\nif(!Array.isArray(all) || !all.length) throw new Error('No platform posts found for publishing');\nreturn all.map(p=>({json:{...p,postId:$json.postId,jobId:$json.jobId,scheduledAt:$json.scheduledAt ?? null,callbackUrl:$json.callbackUrl}}));"
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, error: $json.error?.message ?? $json.error ?? 'Invalid request' } }}",
+        "options": {
+          "responseCode": 400
+        }
       },
-      "id": "b01f5b97-1aa4-402f-8bf4-684f0aca9e08",
+      "id": "685a3bbe-8d92-5b9c-a4a1-75d902cb9cf7",
+      "name": "Reject Publish Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        1220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { platformPosts, ...shared } = $json;\nreturn platformPosts.map(p => ({ json: { ...shared, ...p } }));"
+      },
+      "id": "066c1a16-8d55-54a1-9a53-891667b944c7",
       "name": "Split Publish Platforms",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        784,
-        1120
+        660,
+        1000
       ]
     },
     {
@@ -429,8 +554,8 @@
           },
           "conditions": [
             {
-              "id": "34c689d4-460c-48ea-9c15-14ae1e6bf9d7",
-              "leftValue": "={{ Boolean($json.scheduledAt && new Date($json.scheduledAt).getTime() > Date.now()) }}",
+              "id": "8666c413-a886-5b9c-ba13-552ba2dc09a0",
+              "leftValue": "={{ Boolean($json.scheduledAt && new Date($json.scheduledAt).getTime() > Date.now() + 30000) }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -443,13 +568,13 @@
         },
         "options": {}
       },
-      "id": "6bafc2d4-19ac-42c9-9161-13f2e6bd6b37",
+      "id": "8a0b1e20-2d70-5f78-9e18-7d98be10f5a7",
       "name": "Schedule Required?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1024,
-        1120
+        880,
+        1000
       ]
     },
     {
@@ -457,15 +582,15 @@
         "resume": "specificTime",
         "dateTime": "={{ $json.scheduledAt }}"
       },
-      "id": "dacf9bac-398d-431b-9e56-eb285c0b34f9",
+      "id": "3c4e4fab-17e7-5518-8ac7-88727caa8b08",
       "name": "Wait Until Scheduled",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1344,
-        1008
+        1100,
+        880
       ],
-      "webhookId": "18982822-6e59-43ad-82ac-0c5688e6cf49"
+      "webhookId": "c9b13c0b-8a55-5008-b404-dbe55365849b"
     },
     {
       "parameters": {
@@ -563,30 +688,30 @@
         },
         "options": {}
       },
-      "id": "6aafe43d-7224-436e-b294-563b3d8b815c",
+      "id": "4517e03a-be60-53aa-a094-34a981d8d751",
       "name": "Platform Router",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
       "position": [
-        1696,
-        1104
+        1320,
+        1000
       ]
     },
     {
       "parameters": {
         "person": "nM2WnL56sa",
-        "text": "={{ (() => { const t = String($json.content?.text || ''); const tags = (Array.isArray($json.content?.hashtags) ? $json.content.hashtags : []).map(h => String(h).startsWith('#') ? String(h) : '#' + String(h)).filter(h => !t.includes(h)); return tags.length ? t + '\\n\\n' + tags.join(' ') : t; })() }}",
+        "text": "={{ $json.message }}",
         "additionalFields": {
           "visibility": "PUBLIC"
         }
       },
-      "id": "b49f655e-4cf2-4d7c-ac1b-4cf1caa3b0ca",
+      "id": "e918c69e-8eb7-58cc-9033-afb285f2600e",
       "name": "Publish LinkedIn",
       "type": "n8n-nodes-base.linkedIn",
       "typeVersion": 1,
       "position": [
-        1936,
-        928
+        1580,
+        700
       ],
       "credentials": {
         "linkedInOAuth2Api": {
@@ -598,64 +723,58 @@
     },
     {
       "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const src = $('Platform Router').item.json;\nconst response = { ...$json };\nif (!response.url && response.urn) response.url = 'https://www.linkedin.com/feed/update/' + response.urn;\nif (!response.url && src.platform === 'x' && response.id) response.url = 'https://x.com/i/web/status/' + response.id;\nconst failed =\n  Boolean(response.error) || Number(response.statusCode ?? 200) >= 400;\nconst publishedAt = failed ? null : new Date().toISOString();\n\nconst platformResult = {\n  status: failed ? 'failed' : 'published',\n  ...(response.url ?? response.permalink ?? response.postUrl\n    ? { url: response.url ?? response.permalink ?? response.postUrl }\n    : {}),\n  ...(publishedAt ? { publishedAt } : {}),\n  ...(failed\n    ? {\n        error:\n          typeof response.error === 'string'\n            ? response.error\n            : JSON.stringify(response.error ?? response),\n      }\n    : {}),\n};\n\nconst platformResults = {\n  [src.platform]: platformResult,\n};\n\nreturn {\n  json: {\n    ...src,\n    platformResult,\n    platformResults,\n    publishStatus: platformResult.status,\n    publishedAt,\n  },\n};"
-      },
-      "id": "52b56548-d19d-4b32-8594-eb235e870481",
-      "name": "Normalize Publish Result",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2528,
-        1136
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $json.callbackUrl }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ {postId:$json.postId,platformResults:$json.platformResults} }}",
-        "options": {}
-      },
-      "id": "1734609e-0ea6-4869-b9c8-6559e77f6310",
-      "name": "Return Publish Result to Dashboard",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        2752,
-        1136
-      ],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "4PEJf48hGSqtz6Fi",
-          "name": "Header Auth account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "text": "={{ (() => { const t = String($json.content?.text || ''); const tags = (Array.isArray($json.content?.hashtags) ? $json.content.hashtags : []).map(h => String(h).startsWith('#') ? String(h) : '#' + String(h)).filter(h => !t.includes(h)); return tags.length ? t + '\\n\\n' + tags.join(' ') : t; })() }}",
+        "text": "={{ $json.message }}",
         "additionalFields": {}
       },
-      "id": "8078c063-9653-4233-883c-89298e790409",
+      "id": "4899e8fd-9313-5b48-842f-e6783d317df2",
       "name": "Publish X",
       "type": "n8n-nodes-base.twitter",
       "typeVersion": 2,
       "position": [
-        1936,
-        1056
+        1580,
+        880
       ],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "287b6ac0-9433-5c44-8276-828fd4312958",
+              "leftValue": "={{ Boolean($json.imageUrl) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bbb2bb83-e340-5d32-a163-d6dafb9e0ec5",
+      "name": "Instagram Has Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1580,
+        1080
+      ]
+    },
+    {
+      "parameters": {
         "httpRequestMethod": "POST",
         "graphApiVersion": "v23.0",
-        "node": "1458689310655772",
+        "node": "={{ $json.accounts.instagramAccountId }}",
         "edge": "media",
         "options": {
           "queryParameters": {
@@ -666,19 +785,19 @@
               },
               {
                 "name": "caption",
-                "value": "={{ (() => { const t = String($json.content?.text || ''); const tags = (Array.isArray($json.content?.hashtags) ? $json.content.hashtags : []).map(h => String(h).startsWith('#') ? String(h) : '#' + String(h)).filter(h => !t.includes(h)); return tags.length ? t + '\\n\\n' + tags.join(' ') : t; })() }}"
+                "value": "={{ $json.message }}"
               }
             ]
           }
         }
       },
-      "id": "9668d8f7-0983-41e6-9d07-8035fc8b4cd4",
+      "id": "0846c2d4-6724-5bc5-a553-20f103efa8a3",
       "name": "Create Instagram Media",
       "type": "n8n-nodes-base.facebookGraphApi",
       "typeVersion": 1,
       "position": [
-        1936,
-        1184
+        1800,
+        1020
       ],
       "credentials": {
         "facebookGraphApi": {
@@ -690,28 +809,43 @@
     },
     {
       "parameters": {
+        "amount": 8,
+        "unit": "seconds"
+      },
+      "id": "43e53a09-9e46-5d11-829f-888a9a53075a",
+      "name": "Wait for Instagram Processing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2020,
+        1020
+      ],
+      "webhookId": "d79d89e2-98ce-55db-9f0c-016b1f46680b"
+    },
+    {
+      "parameters": {
         "httpRequestMethod": "POST",
         "graphApiVersion": "v23.0",
-        "node": "1458689310655772",
+        "node": "={{ $('Platform Router').item.json.accounts.instagramAccountId }}",
         "edge": "media_publish",
         "options": {
           "queryParameters": {
             "parameter": [
               {
                 "name": "creation_id",
-                "value": "={{ $json.id }}"
+                "value": "={{ $('Create Instagram Media').item.json.id }}"
               }
             ]
           }
         }
       },
-      "id": "35e7af1f-2575-41e6-b081-c2dd19d6bc20",
+      "id": "06e02b77-891d-5d7d-aa51-e380bd5be86e",
       "name": "Publish Instagram",
       "type": "n8n-nodes-base.facebookGraphApi",
       "typeVersion": 1,
       "position": [
-        2128,
-        1184
+        2240,
+        1020
       ],
       "credentials": {
         "facebookGraphApi": {
@@ -723,21 +857,26 @@
     },
     {
       "parameters": {
-        "httpRequestMethod": "POST",
         "graphApiVersion": "v23.0",
-        "node": "1458689310655772",
-        "edge": "={{ $json.imageUrl ? 'photos' : 'feed' }}",
+        "node": "={{ $json.id }}",
         "options": {
-          "queryParametersJson": "={{ JSON.stringify($json.imageUrl ? { url: $json.imageUrl, caption: (() => { const t = String($json.content?.text || ''); const tags = (Array.isArray($json.content?.hashtags) ? $json.content.hashtags : []).map(h => String(h).startsWith('#') ? String(h) : '#' + String(h)).filter(h => !t.includes(h)); return tags.length ? t + '\\n\\n' + tags.join(' ') : t; })() } : { message: (() => { const t = String($json.content?.text || ''); const tags = (Array.isArray($json.content?.hashtags) ? $json.content.hashtags : []).map(h => String(h).startsWith('#') ? String(h) : '#' + String(h)).filter(h => !t.includes(h)); return tags.length ? t + '\\n\\n' + tags.join(' ') : t; })() }) }}"
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "fields",
+                "value": "permalink"
+              }
+            ]
+          }
         }
       },
-      "id": "f8b3cb0e-bc3e-4c2e-9172-768f562d7437",
-      "name": "Publish Facebook",
+      "id": "54782344-6346-5ac8-9e52-86782e6d81ea",
+      "name": "Get Instagram Permalink",
       "type": "n8n-nodes-base.facebookGraphApi",
       "typeVersion": 1,
       "position": [
-        1952,
-        1344
+        2460,
+        1020
       ],
       "credentials": {
         "facebookGraphApi": {
@@ -746,6 +885,91 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: { error: 'Instagram needs an image. Add one on the review page and retry.' } };"
+      },
+      "id": "fe048522-e6c9-5966-ad58-ba495bc5e148",
+      "name": "Instagram Needs Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "graphApiVersion": "v23.0",
+        "node": "={{ $json.accounts.facebookPageId }}",
+        "edge": "={{ $json.imageUrl ? 'photos' : 'feed' }}",
+        "options": {
+          "queryParametersJson": "={{ JSON.stringify($json.imageUrl ? { url: $json.imageUrl, caption: $json.message } : { message: $json.message }) }}"
+        }
+      },
+      "id": "74519a11-7789-5993-9059-cfde5037d0b7",
+      "name": "Publish Facebook",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        1580,
+        1360
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "K16JQxc47yQCnZl9",
+          "name": "Facebook Graph account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const src = $('Platform Router').item.json;\nconst r = { ...$json };\nconst err = r.error\n  ? (typeof r.error === 'string' ? r.error : r.error.message || JSON.stringify(r.error))\n  : (Number(r.statusCode ?? 200) >= 400 ? JSON.stringify(r) : null);\n\nlet url = r.url ?? r.permalink ?? r.postUrl ?? null;\nif (!err && !url) {\n  if (src.platform === 'linkedin' && (r.urn || r.id)) url = 'https://www.linkedin.com/feed/update/' + (r.urn || r.id);\n  if (src.platform === 'x' && (r.id || r.data?.id)) url = 'https://x.com/i/web/status/' + (r.id || r.data?.id);\n  if (src.platform === 'facebook' && (r.post_id || r.id)) url = 'https://www.facebook.com/' + (r.post_id || r.id);\n}\n\nconst result = err\n  ? { status: 'failed', error: err }\n  : { status: 'published', ...(url ? { url } : {}), publishedAt: new Date().toISOString() };\n\nreturn { json: {\n  postId: src.postId,\n  callbackUrl: src.callbackUrl,\n  platform: src.platform,\n  platformResults: { [src.platform]: result },\n} };"
+      },
+      "id": "6fdec944-44d3-5250-915e-ecc4249a6f7c",
+      "name": "Normalize Publish Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2700,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callbackUrl }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { postId: $json.postId, platformResults: $json.platformResults } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "5d958853-ef2e-58ee-a677-337753a228fc",
+      "name": "Return Publish Result to Dashboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2920,
+        1000
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4PEJf48hGSqtz6Fi",
+          "name": "Header Auth account"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
     }
   ],
   "pinData": {},
@@ -762,6 +986,24 @@
       ]
     },
     "Normalize Request": {
+      "main": [
+        [
+          {
+            "node": "Accept Create Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Create Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accept Create Request": {
       "main": [
         [
           {
@@ -794,18 +1036,7 @@
         ]
       ]
     },
-    "Write Platform Post": {
-      "main": [
-        [
-          {
-            "node": "Aggregate Generated Content",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OpenAI Chat Model": {
+    "Claude Sonnet (Post Writer)": {
       "ai_languageModel": [
         [
           {
@@ -816,7 +1047,7 @@
         ]
       ]
     },
-    "OpenAI Chat Model1": {
+    "Claude Haiku (Fallback)": {
       "ai_languageModel": [
         [
           {
@@ -838,84 +1069,62 @@
         ]
       ]
     },
-    "Aggregate Generated Content": {
+    "Write Platform Post": {
       "main": [
         [
           {
-            "node": "User Image?",
+            "node": "Aggregate Generated Content",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "User Image?": {
+    "Aggregate Generated Content": {
       "main": [
         [
           {
-            "node": "Use User Image",
+            "node": "Needs AI Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs AI Image?": {
+      "main": [
+        [
+          {
+            "node": "Write Image Prompt",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
+            "node": "Keep Existing Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Sonnet (Image Prompt)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write Image Prompt",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Image Prompt": {
+      "main": [
+        [
+          {
             "node": "Generate Image",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Use User Image": {
-      "main": [
-        [
-          {
-            "node": "Download User Image",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Download User Image": {
-      "main": [
-        [
-          {
-            "node": "Upload Image to Drive",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Upload Image to Drive": {
-      "main": [
-        [
-          {
-            "node": "Make Image Public",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Make Image Public": {
-      "main": [
-        [
-          {
-            "node": "Merge Image",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge Image": {
-      "main": [
-        [
-          {
-            "node": "Return Generated Content to Dashboard",
             "type": "main",
             "index": 0
           }
@@ -926,7 +1135,51 @@
       "main": [
         [
           {
-            "node": "Upload Image to Drive",
+            "node": "Image to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image to File": {
+      "main": [
+        [
+          {
+            "node": "Upload Image to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Image to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Attach AI Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach AI Image": {
+      "main": [
+        [
+          {
+            "node": "Return Generated Content to Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Existing Image": {
+      "main": [
+        [
+          {
+            "node": "Return Generated Content to Dashboard",
             "type": "main",
             "index": 0
           }
@@ -945,6 +1198,24 @@
       ]
     },
     "Normalize Publish Request": {
+      "main": [
+        [
+          {
+            "node": "Accept Publish Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Publish Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accept Publish Request": {
       "main": [
         [
           {
@@ -1013,7 +1284,7 @@
         ],
         [
           {
-            "node": "Create Instagram Media",
+            "node": "Instagram Has Image?",
             "type": "main",
             "index": 0
           }
@@ -1021,6 +1292,57 @@
         [
           {
             "node": "Publish Facebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram Has Image?": {
+      "main": [
+        [
+          {
+            "node": "Create Instagram Media",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Instagram Needs Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Instagram Media": {
+      "main": [
+        [
+          {
+            "node": "Wait for Instagram Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Instagram Processing": {
+      "main": [
+        [
+          {
+            "node": "Publish Instagram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish Instagram": {
+      "main": [
+        [
+          {
+            "node": "Get Instagram Permalink",
             "type": "main",
             "index": 0
           }
@@ -1038,34 +1360,29 @@
         ]
       ]
     },
-    "Normalize Publish Result": {
-      "main": [
-        [
-          {
-            "node": "Return Publish Result to Dashboard",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Publish X": {
       "main": [
-        []
-      ]
-    },
-    "Create Instagram Media": {
-      "main": [
         [
           {
-            "node": "Publish Instagram",
+            "node": "Normalize Publish Result",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Publish Instagram": {
+    "Get Instagram Permalink": {
+      "main": [
+        [
+          {
+            "node": "Normalize Publish Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram Needs Image": {
       "main": [
         [
           {
@@ -1086,70 +1403,24 @@
           }
         ]
       ]
+    },
+    "Normalize Publish Result": {
+      "main": [
+        [
+          {
+            "node": "Return Publish Result to Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate",
     "availableInMCP": true
   },
-  "versionId": "41074829-294b-4b50-bb60-4c63926b8001",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "ba339534cce222ec20d91a109378394e2e5dfdf919ce34506982213fea7f0036"
-  },
-  "nodeGroups": [
-    {
-      "id": "48c6b34e-a6f3-4ba9-ae0e-6c0682dc2a81",
-      "name": "Write platform posts",
-      "nodeIds": [
-        "b4736904-93e2-4631-9217-5872913b7c7e",
-        "801e8cdf-9b71-4bbf-995e-2f5ba5021fa3",
-        "f0cd736d-dfad-475b-a402-b2ec93f49e9c",
-        "705b993a-f3da-4f3b-8471-c577ec92b047",
-        "19589d27-86a0-4e91-bc5c-5cc53b6225fe",
-        "133c179f-6a0c-4119-a615-7af20c325de4",
-        "2da61c09-6fa3-474b-867d-a4c6fa7d8bea",
-        "1ed698be-fb72-474c-ab71-2fe0ed91ca94"
-      ],
-      "description": "Validates the dashboard request and drafts one tailored post per selected network, with hashtags and fact-check warnings"
-    },
-    {
-      "id": "e99e969e-09d5-4269-9f55-75edf973e9e4",
-      "name": "Prepare image for review",
-      "nodeIds": [
-        "f638bd9f-c5e0-4035-88b7-5f6efc61afaf",
-        "de80045a-3411-47be-97ea-c2be9f2292fd",
-        "74f314ff-6f01-42ed-9839-60f3a8dc844c",
-        "fdcb9efa-4acf-4238-9f2f-3bebf38b99b6",
-        "47cfc230-e59c-49ab-9bd0-ddfae5bd0fbc",
-        "daf4ba47-6c58-49a9-95a0-453787238611",
-        "c05753dc-ab24-4098-a47a-db4490a5406f",
-        "45667d48-3171-4996-be5c-7a4cf59431dd"
-      ],
-      "description": "Uses the uploaded image or creates one with AI, stores it publicly in Drive, then sends drafts back for approval"
-    },
-    {
-      "id": "42fbed1e-3869-4bea-b9b7-f2c298817582",
-      "name": "Publish approved post",
-      "nodeIds": [
-        "529d4dfd-cd32-477e-8f8a-b18f86090c24",
-        "b01f5b97-1aa4-402f-8bf4-684f0aca9e08",
-        "6bafc2d4-19ac-42c9-9161-13f2e6bd6b37",
-        "dacf9bac-398d-431b-9e56-eb285c0b34f9",
-        "6aafe43d-7224-436e-b294-563b3d8b815c",
-        "b49f655e-4cf2-4d7c-ac1b-4cf1caa3b0ca",
-        "8078c063-9653-4233-883c-89298e790409",
-        "9668d8f7-0983-41e6-9d07-8035fc8b4cd4",
-        "35e7af1f-2575-41e6-b081-c2dd19d6bc20",
-        "f8b3cb0e-bc3e-4c2e-9172-768f562d7437",
-        "52b56548-d19d-4b32-8594-eb235e870481",
-        "1734609e-0ea6-4869-b9c8-6559e77f6310"
-      ],
-      "description": "Waits for the scheduled time if set, posts to each chosen network and reports per-platform results to the dashboard"
-    }
-  ],
-  "id": "5rd14SHHdLBun5Ll",
   "tags": []
 }

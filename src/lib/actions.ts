@@ -1,11 +1,18 @@
 "use server";
 
-import { ObjectId } from "mongodb";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getSettings, postsCollection, accountsCollection, settingsCollection } from "./db";
+import {
+  getPostById,
+  getSettings,
+  insertPost,
+  setAccountStatus,
+  updatePost,
+  updateSettings,
+} from "./db";
 import { triggerCreatePostWebhook, triggerPublishPostWebhook } from "./n8n";
-import type { Platform, PlatformContent, PlatformResult, PostDoc } from "./types";
+import { createImageUploadTarget, uploadPostImage } from "./supabase";
+import type { Platform, PlatformContent, PlatformResult, Post, PostDoc, RewriteRequest } from "./types";
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -13,57 +20,57 @@ function getBaseUrl(): string {
   return process.env.APP_BASE_URL || "http://localhost:3000";
 }
 
-async function setPostFields(id: string, patch: Partial<PostDoc>): Promise<void> {
-  const col = await postsCollection();
-  await col.updateOne(
-    { _id: new ObjectId(id) },
-    { $set: { ...patch, updatedAt: new Date() } }
-  );
+const callbackUrl = () => `${getBaseUrl()}/api/n8n/callback`;
+
+/** When the publish workflow should post: now for "post now", otherwise the saved time (or now if it has passed). */
+function publishAt(post: Post): string {
+  const now = Date.now();
+  if (post.postNow || !post.scheduledAt) return new Date(now).toISOString();
+  return new Date(Math.max(now, new Date(post.scheduledAt).getTime())).toISOString();
+}
+
+function validImage(file: FormDataEntryValue | null): file is File {
+  if (!(file instanceof File) || file.size === 0) return false;
+  if (file.size > MAX_UPLOAD_BYTES) throw new Error("Image is larger than 5MB.");
+  if (file.type && !file.type.startsWith("image/")) throw new Error("Please choose an image file.");
+  return true;
 }
 
 export async function createPostAction(formData: FormData): Promise<void> {
   const topic = String(formData.get("topic") || "").trim();
+  const postNow = formData.get("postNow") === "1";
   const date = String(formData.get("date") || "");
   const time = String(formData.get("time") || "");
-  const scheduledAt = String(formData.get("scheduledAt") || "");
+  const scheduledAt = postNow ? "" : String(formData.get("scheduledAt") || "");
   const platforms = formData.getAll("platforms").map(String) as Platform[];
   const imageMode = String(formData.get("imageMode") || "ai") as "ai" | "upload";
   const imagePrompt = String(formData.get("imagePrompt") || "").trim();
   const audience = String(formData.get("audience") || "").trim();
-  const goal = String(formData.get("goal") || "").trim();
   const language = String(formData.get("language") || "").trim();
   const imageFile = formData.get("imageFile");
 
-  if (!topic || !date || !time || platforms.length === 0) {
-    throw new Error("Topic, date, time, and at least one platform are required.");
+  if (!topic || platforms.length === 0) {
+    throw new Error("Topic and at least one platform are required.");
   }
-
-  let imageUrl: string | undefined;
-  if (imageMode === "upload" && imageFile instanceof File && imageFile.size > 0) {
-    if (imageFile.size > MAX_UPLOAD_BYTES) {
-      throw new Error("Image is larger than 5MB.");
-    }
-    const buf = Buffer.from(await imageFile.arrayBuffer());
-    imageUrl = `data:${imageFile.type};base64,${buf.toString("base64")}`;
+  if (!date || !time || (!postNow && !scheduledAt)) {
+    throw new Error("Pick a date and time, or choose Post now.");
   }
+  const hasUpload = imageMode === "upload" && validImage(imageFile);
 
-  const col = await postsCollection();
   const settings = await getSettings();
   const now = new Date();
-
   const doc: PostDoc = {
     topic,
     date,
     time,
     scheduledAt: scheduledAt || undefined,
+    postNow,
     platforms,
     imageMode,
     imagePrompt: imageMode === "ai" ? imagePrompt : undefined,
-    imageUrl,
     content: {},
     warnings: [],
     audience,
-    goal,
     language,
     status: "processing",
     attempts: 0,
@@ -72,29 +79,41 @@ export async function createPostAction(formData: FormData): Promise<void> {
     updatedAt: now,
   };
 
-  const result = await col.insertOne(doc);
-  const postId = String(result.insertedId);
+  const postId = await insertPost(doc);
 
-  const res = await triggerCreatePostWebhook({
-    postId,
-    topic,
-    date,
-    time,
-    scheduledAt: scheduledAt || new Date(`${date}T${time}`).toISOString(),
-    platforms,
-    imageMode,
-    imageUrl,
-    imagePrompt,
-    audience,
-    goal,
-    language,
-    brandVoice: settings.brandVoice,
-    callbackUrl: `${getBaseUrl()}/api/n8n/callback`,
-  });
-  if (!res.called || res.ok === false) {
-    await setPostFields(postId, {
+  let imageUrl: string | undefined;
+  try {
+    if (hasUpload) {
+      imageUrl = await uploadPostImage(postId, imageFile as File);
+      await updatePost(postId, { imageUrl });
+    }
+    const imageUpload = imageMode === "ai" ? await createImageUploadTarget(postId) : undefined;
+
+    const res = await triggerCreatePostWebhook({
+      postId,
+      topic,
+      date,
+      time,
+      scheduledAt: scheduledAt || null,
+      postNow,
+      platforms,
+      imageMode,
+      imageUrl,
+      imagePrompt,
+      imageUpload,
+      audience,
+      language,
+      brandVoice: settings.brandVoice,
+      bannedWords: settings.bannedWords,
+      callbackUrl: callbackUrl(),
+    });
+    if (!res.called || res.ok === false) {
+      throw new Error(res.error || "Could not reach the n8n create-post workflow.");
+    }
+  } catch (err) {
+    await updatePost(postId, {
       status: "failed",
-      lastError: res.error || "Could not reach the n8n create-post workflow.",
+      lastError: err instanceof Error ? err.message : "Could not start the create-post workflow.",
     });
   }
 
@@ -104,8 +123,7 @@ export async function createPostAction(formData: FormData): Promise<void> {
 }
 
 export async function approvePostAction(id: string): Promise<void> {
-  const col = await postsCollection();
-  const post = await col.findOne({ _id: new ObjectId(id) });
+  const post = await getPostById(id);
   if (!post) return;
 
   const results: Partial<Record<Platform, PlatformResult>> = { ...(post.results || {}) };
@@ -113,20 +131,20 @@ export async function approvePostAction(id: string): Promise<void> {
     results[p] = { ...(results[p] || { status: "not_sent" }), status: "scheduled" };
   }
 
-  await setPostFields(id, { status: "scheduled", results });
+  await updatePost(id, { status: "scheduled", results });
   const res = await triggerPublishPostWebhook({
     postId: id,
     topic: post.topic,
     date: post.date,
     time: post.time,
-    scheduledAt: post.scheduledAt || new Date(`${post.date}T${post.time}`).toISOString(),
+    scheduledAt: publishAt(post),
     platforms: post.platforms,
     content: post.content,
     imageUrl: post.imageUrl,
-    callbackUrl: `${getBaseUrl()}/api/n8n/callback`,
+    callbackUrl: callbackUrl(),
   });
   if (!res.called || res.ok === false) {
-    await setPostFields(id, {
+    await updatePost(id, {
       status: "failed",
       lastError: res.error || "Could not reach the n8n publish workflow.",
     });
@@ -140,20 +158,13 @@ export async function rejectPostAction(
   id: string,
   input?: { reason?: string; note?: string; banWord?: string }
 ): Promise<void> {
-  await setPostFields(id, {
+  await updatePost(id, {
     status: "rejected",
     rejectionReason: input?.reason,
     rejectionNote: input?.note,
   });
 
-  if (input?.banWord) {
-    const settings = await settingsCollection();
-    await settings.updateOne(
-      { _id: "global" },
-      { $addToSet: { bannedWords: input.banWord } },
-      { upsert: true }
-    );
-  }
+  if (input?.banWord) await addBannedWord(input.banWord);
 
   revalidatePath("/");
   revalidatePath("/approvals");
@@ -161,39 +172,52 @@ export async function rejectPostAction(
   revalidatePath(`/post/${id}/review`);
 }
 
-export async function requestRewriteAction(id: string): Promise<void> {
-  const col = await postsCollection();
-  const post = await col.findOne({ _id: new ObjectId(id) });
+export async function requestRewriteAction(id: string, request?: RewriteRequest): Promise<void> {
+  const post = await getPostById(id);
   if (!post) return;
 
   const settings = await getSettings();
-  await setPostFields(id, {
+  await updatePost(id, {
     status: "processing",
     warnings: [],
   });
 
-  const res = await triggerCreatePostWebhook({
-    postId: id,
-    topic: post.topic,
-    date: post.date,
-    time: post.time,
-    scheduledAt: post.scheduledAt || new Date(`${post.date}T${post.time}`).toISOString(),
-    platforms: post.platforms,
-    imageMode: post.imageMode,
-    imageUrl: post.imageUrl,
-    imagePrompt: post.imagePrompt,
-    audience: post.audience,
-    goal: post.goal,
-    language: post.language,
-    brandVoice: settings.brandVoice,
-    rewrite: true,
-    currentContent: post.content,
-    callbackUrl: `${getBaseUrl()}/api/n8n/callback`,
-  });
-  if (!res.called || res.ok === false) {
-    await setPostFields(id, {
+  try {
+    // Keep the current image; only ask n8n for a new one if the last attempt never produced it.
+    const imageUpload =
+      post.imageMode === "ai" && !post.imageUrl ? await createImageUploadTarget(id) : undefined;
+    const platforms = request?.platforms?.length
+      ? post.platforms.filter((p) => request.platforms?.includes(p))
+      : post.platforms;
+
+    const res = await triggerCreatePostWebhook({
+      postId: id,
+      topic: post.topic,
+      date: post.date,
+      time: post.time,
+      scheduledAt: post.postNow ? null : post.scheduledAt ?? null,
+      postNow: post.postNow,
+      platforms,
+      imageMode: post.imageMode,
+      imageUrl: post.imageUrl,
+      imagePrompt: post.imagePrompt,
+      imageUpload,
+      audience: post.audience,
+      language: post.language,
+      brandVoice: settings.brandVoice,
+      bannedWords: settings.bannedWords,
+      rewrite: true,
+      rewriteRequest: request,
+      currentContent: post.content,
+      callbackUrl: callbackUrl(),
+    });
+    if (!res.called || res.ok === false) {
+      throw new Error(res.error || "Could not reach the n8n rewrite workflow.");
+    }
+  } catch (err) {
+    await updatePost(id, {
       status: "failed",
-      lastError: res.error || "Could not reach the n8n rewrite workflow.",
+      lastError: err instanceof Error ? err.message : "Could not start the rewrite workflow.",
     });
   }
 
@@ -202,35 +226,35 @@ export async function requestRewriteAction(id: string): Promise<void> {
 }
 
 export async function retryPostAction(id: string): Promise<void> {
-  const col = await postsCollection();
-  const post = await col.findOne({ _id: new ObjectId(id) });
+  const post = await getPostById(id);
   if (!post) return;
 
-  await col.updateOne(
-    { _id: new ObjectId(id) },
-    {
-      $set: {
-        status: "scheduled",
-        attempts: (post.attempts || 0) + 1,
-        lastAttemptAt: new Date().toISOString(),
-        updatedAt: new Date(),
-      },
-      $unset: { lastError: "" },
-    }
-  );
+  const platforms = post.platforms.filter((platform) => post.results?.[platform]?.status !== "published");
+  const results: Partial<Record<Platform, PlatformResult>> = { ...(post.results || {}) };
+  for (const p of platforms) {
+    results[p] = { ...(results[p] || { status: "not_sent" }), status: "scheduled", error: undefined };
+  }
+
+  await updatePost(id, {
+    status: "scheduled",
+    attempts: (post.attempts || 0) + 1,
+    lastAttemptAt: new Date().toISOString(),
+    lastError: null,
+    results,
+  });
   const res = await triggerPublishPostWebhook({
     postId: id,
     topic: post.topic,
     date: post.date,
     time: post.time,
-    scheduledAt: post.scheduledAt || new Date(`${post.date}T${post.time}`).toISOString(),
-    platforms: post.platforms.filter((platform) => post.results?.[platform]?.status !== "published"),
+    scheduledAt: publishAt(post),
+    platforms,
     content: post.content,
     imageUrl: post.imageUrl,
-    callbackUrl: `${getBaseUrl()}/api/n8n/callback`,
+    callbackUrl: callbackUrl(),
   });
   if (!res.called || res.ok === false) {
-    await setPostFields(id, {
+    await updatePost(id, {
       status: "failed",
       lastError: res.error || "Could not reach the n8n publish workflow.",
     });
@@ -242,7 +266,7 @@ export async function retryPostAction(id: string): Promise<void> {
 }
 
 export async function giveUpOnPostAction(id: string): Promise<void> {
-  await setPostFields(id, { status: "rejected" });
+  await updatePost(id, { status: "rejected" });
   revalidatePath("/");
   revalidatePath("/approvals");
   redirect("/approvals");
@@ -253,16 +277,27 @@ export async function updatePlatformContentAction(
   platform: Platform,
   content: PlatformContent
 ): Promise<void> {
-  const col = await postsCollection();
-  await col.updateOne(
-    { _id: new ObjectId(id) },
-    { $set: { [`content.${platform}`]: content, updatedAt: new Date() } }
-  );
+  const post = await getPostById(id);
+  if (!post) return;
+  await updatePost(id, { content: { ...post.content, [platform]: content } });
   revalidatePath(`/post/${id}`);
 }
 
 export async function reschedulePostAction(id: string, date: string): Promise<void> {
-  await setPostFields(id, { date });
+  const post = await getPostById(id);
+  if (!post) return;
+
+  // Shift the stored instant by the same number of days so the author's time zone is kept.
+  const dayMs = 24 * 60 * 60 * 1000;
+  const days = Math.round(
+    (new Date(`${date}T00:00:00Z`).getTime() - new Date(`${post.date}T00:00:00Z`).getTime()) / dayMs
+  );
+  const base = post.scheduledAt ? new Date(post.scheduledAt).getTime() : new Date(`${post.date}T${post.time}:00Z`).getTime();
+  await updatePost(id, {
+    date,
+    postNow: false,
+    scheduledAt: new Date(base + days * dayMs).toISOString(),
+  });
   revalidatePath("/calendar");
   revalidatePath("/approvals");
   revalidatePath(`/post/${id}`);
@@ -271,23 +306,14 @@ export async function reschedulePostAction(id: string, date: string): Promise<vo
 
 export async function updatePostImageAction(id: string, formData: FormData): Promise<void> {
   const file = formData.get("imageFile");
-  if (!(file instanceof File) || file.size === 0) return;
-  if (file.size > MAX_UPLOAD_BYTES) {
-    throw new Error("Image is larger than 5MB.");
-  }
-  const buf = Buffer.from(await file.arrayBuffer());
-  const imageUrl = `data:${file.type};base64,${buf.toString("base64")}`;
-  await setPostFields(id, { imageUrl });
+  if (!validImage(file)) return;
+  const imageUrl = await uploadPostImage(id, file);
+  await updatePost(id, { imageUrl });
   revalidatePath(`/post/${id}`);
 }
 
 export async function reconnectAccountAction(platform: Platform): Promise<void> {
-  const col = await accountsCollection();
-  await col.updateOne(
-    { platform },
-    { $set: { status: "connected", updatedAt: new Date() } },
-    { upsert: true }
-  );
+  await setAccountStatus(platform, "connected");
   revalidatePath("/");
   revalidatePath("/approvals");
   revalidatePath("/new-post");
@@ -299,29 +325,26 @@ export async function saveBrandVoiceAction(formData: FormData): Promise<void> {
   const sampleText = String(formData.get("sampleText") || "");
   const doNots = String(formData.get("doNots") || "");
 
-  const col = await settingsCollection();
-  await col.updateOne(
-    { _id: "global" },
-    { $set: { brandVoice: { tone, keywords, sampleText, doNots } } },
-    { upsert: true }
-  );
+  await updateSettings({ brandVoice: { tone, keywords, sampleText, doNots } });
   revalidatePath("/settings");
 }
 
-export async function addBannedWordAction(word: string): Promise<void> {
+async function addBannedWord(word: string): Promise<void> {
   const trimmed = word.trim().toLowerCase();
   if (!trimmed) return;
-  const col = await settingsCollection();
-  await col.updateOne(
-    { _id: "global" },
-    { $addToSet: { bannedWords: trimmed } },
-    { upsert: true }
-  );
+  const { bannedWords = [] } = await getSettings();
+  if (!bannedWords.includes(trimmed)) {
+    await updateSettings({ bannedWords: [...bannedWords, trimmed] });
+  }
+}
+
+export async function addBannedWordAction(word: string): Promise<void> {
+  await addBannedWord(word);
   revalidatePath("/settings");
 }
 
 export async function removeBannedWordAction(word: string): Promise<void> {
-  const col = await settingsCollection();
-  await col.updateOne({ _id: "global" }, { $pull: { bannedWords: word } });
+  const { bannedWords = [] } = await getSettings();
+  await updateSettings({ bannedWords: bannedWords.filter((w) => w !== word) });
   revalidatePath("/settings");
 }

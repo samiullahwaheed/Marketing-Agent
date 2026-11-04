@@ -1,5 +1,3 @@
-import type { ObjectId } from "mongodb";
-
 export type Platform = "linkedin" | "x" | "instagram" | "facebook";
 
 export type PostStatus =
@@ -30,17 +28,18 @@ export interface PlatformResult {
 }
 
 export interface PostDoc {
-  _id?: ObjectId;
+  id?: string;
   topic: string;
   date: string;
   time: string;
   scheduledAt?: string;
+  /** No date/time was picked: publish as soon as the post is approved. */
+  postNow: boolean;
   platforms: Platform[];
   imageMode: "ai" | "upload";
   imagePrompt?: string;
   imageUrl?: string;
   audience?: string;
-  goal?: string;
   language?: string;
   content: Partial<Record<Platform, PlatformContent>>;
   warnings?: string[];
@@ -56,21 +55,20 @@ export interface PostDoc {
   updatedAt: Date;
 }
 
-export interface Post extends Omit<PostDoc, "_id" | "createdAt" | "updatedAt"> {
+export interface Post extends Omit<PostDoc, "id" | "createdAt" | "updatedAt"> {
   id: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface AccountDoc {
-  _id?: ObjectId;
   platform: Platform;
   label: string;
   status: AccountStatus;
   updatedAt: Date;
 }
 
-export interface Account extends Omit<AccountDoc, "_id" | "updatedAt"> {
+export interface Account extends Omit<AccountDoc, "updatedAt"> {
   id: string;
   updatedAt: string;
 }
@@ -83,9 +81,16 @@ export interface BrandVoiceDoc {
 }
 
 export interface SettingsDoc {
-  _id: "global";
   aiCreditsPercent: number;
   aiCreditsPostsLeft: number;
   brandVoice: BrandVoiceDoc;
   bannedWords?: string[];
+}
+
+/** What the user asked for on the Rewrite page; forwarded to n8n. */
+export interface RewriteRequest {
+  instructions?: string;
+  options?: string[];
+  platforms?: Platform[];
+  keepHashtags?: boolean;
 }
