@@ -28,14 +28,19 @@ export function approvalsTab(status: PostStatus): ApprovalsTab {
   return status;
 }
 
+/** True when at least one platform has the post live, even if another platform failed. */
+export function hasLivePlatform(post: Pick<Post, "results">): boolean {
+  return Object.values(post.results ?? {}).some((r) => r?.status === "published");
+}
+
 /**
- * Where clicking a post should take you. Published posts open their report;
+ * Where clicking a post should take you. Published posts, and failed posts that
+ * went live on some platform, open their report with a tab per platform;
  * everything else (waiting, processing, scheduled, rejected) opens the review
  * screen, which shows an "Already {status}" chip instead of Approve when it
- * isn't awaiting approval. Failed posts are only ever reached inline from
- * Approvals' "Needs a fix" row, never through this helper.
+ * isn't awaiting approval.
  */
-export function postLink(post: Pick<Post, "id" | "status">): string {
-  if (post.status === "published") return `/post/${post.id}`;
+export function postLink(post: Pick<Post, "id" | "status" | "results">): string {
+  if (post.status === "published" || (post.status === "failed" && hasLivePlatform(post))) return `/post/${post.id}`;
   return `/post/${post.id}/review`;
 }

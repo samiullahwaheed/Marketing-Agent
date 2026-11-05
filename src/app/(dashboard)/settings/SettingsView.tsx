@@ -9,18 +9,11 @@ import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { Chip } from "@/components/Chip";
 import { PageHeader } from "@/components/PageHeader";
+import { PlatformBadge } from "@/components/PlatformBadge";
 import { Pill } from "@/components/Pill";
 
 const row = "flex flex-wrap items-center gap-3.5 py-3.5 border-t border-divider";
 
-function PlatformTile({ platform }: { platform: keyof typeof PLATFORMS }) {
-  const p = PLATFORMS[platform];
-  return (
-    <span className={`inline-flex items-center justify-center w-[34px] h-[34px] rounded-[9px] text-white text-[13px] font-bold leading-none flex-none ${p.bg}`} aria-hidden="true">
-      {p.short}
-    </span>
-  );
-}
 
 export default function SettingsView({ accounts, settings }: { accounts: Account[]; settings: SettingsDoc }) {
   const [bannedWords, setBannedWords] = useState(settings.bannedWords ?? []);
@@ -69,7 +62,7 @@ export default function SettingsView({ accounts, settings }: { accounts: Account
               if (status === "reconnect") {
                 return (
                   <div key={platform} className={`${row} bg-[#FDF6F5] -mx-6 px-6`}>
-                    <PlatformTile platform={platform} />
+                    <PlatformBadge platform={platform} size="lg" />
                     <div className="flex-[1_1_160px]">
                       <strong>{label}</strong>
                       <div className="text-[13.5px] text-error">Login expired · reconnect to resume posting</div>
@@ -82,7 +75,7 @@ export default function SettingsView({ accounts, settings }: { accounts: Account
               }
               return (
                 <div key={platform} className={row}>
-                  <PlatformTile platform={platform} />
+                  <PlatformBadge platform={platform} size="lg" />
                   <div className="flex-[1_1_160px]">
                     <strong>{label}</strong>
                     <div className="text-muted text-[13.5px]">{status === "connected" ? "Connected" : "Not connected"}</div>

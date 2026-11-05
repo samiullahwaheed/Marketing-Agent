@@ -6,7 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 import { retryPostAction } from "@/lib/actions";
 import { formatDayMonth, formatDayMonthTime, goesOutLabel, relativeDays } from "@/lib/format";
 import { PLATFORMS } from "@/lib/platforms";
-import { APPROVALS_TABS, approvalsTab, approvalsTabLabel, postLink, type ApprovalsTab } from "@/lib/status";
+import { APPROVALS_TABS, approvalsTab, approvalsTabLabel, hasLivePlatform, postLink, type ApprovalsTab } from "@/lib/status";
 import type { Platform, Post } from "@/lib/types";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
@@ -172,7 +172,11 @@ export default function ApprovalsView({
               <h2 className="heading text-[19px] pb-1.5">Needs a fix</h2>
               {failed.map((post) => (
                 <div key={post.id} className={row}>
-                  <PlatformBadge platform={post.platforms[0]} />
+                  <span className="flex gap-1">
+                    {post.platforms.map((p) => (
+                      <PlatformBadge key={p} platform={p} />
+                    ))}
+                  </span>
                   <div className="flex-[1_1_260px] min-w-0">
                     <div className="font-bold">{post.topic}</div>
                     <div className="text-sm text-error">
@@ -183,9 +187,15 @@ export default function ApprovalsView({
                     {retrying === post.id && <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />}
                     Try again
                   </Button>
-                  <Button variant="ghost" to={`/post/${post.id}/review`}>
-                    Edit post
-                  </Button>
+                  {hasLivePlatform(post) ? (
+                    <Button variant="ghost" to={`/post/${post.id}`}>
+                      See what went live
+                    </Button>
+                  ) : (
+                    <Button variant="ghost" to={`/post/${post.id}/review`}>
+                      Edit post
+                    </Button>
+                  )}
                 </div>
               ))}
             </Card>
@@ -203,7 +213,11 @@ export default function ApprovalsView({
             ) : (
               recentlyDecided.map((post) => (
                 <div key={post.id} className={row}>
-                  <PlatformBadge platform={post.platforms[0]} />
+                  <span className="flex gap-1">
+                    {post.platforms.map((p) => (
+                      <PlatformBadge key={p} platform={p} />
+                    ))}
+                  </span>
                   <div className="flex-[1_1_260px] min-w-0">
                     <div className="font-bold">{post.topic}</div>
                     <div className="text-muted text-sm">

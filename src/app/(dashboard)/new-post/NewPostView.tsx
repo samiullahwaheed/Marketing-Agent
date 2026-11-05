@@ -11,6 +11,7 @@ import type { Account, Platform } from "@/lib/types";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { PageHeader } from "@/components/PageHeader";
+import { PlatformBadge } from "@/components/PlatformBadge";
 import { Pill } from "@/components/Pill";
 import { PostImage } from "@/components/PostImage";
 
@@ -48,17 +49,6 @@ function Segment({ on, onClick, children }: { on: boolean; onClick: () => void; 
   );
 }
 
-function PlatformTile({ platform }: { platform: Platform }) {
-  const p = PLATFORMS[platform];
-  return (
-    <span
-      className={`inline-flex items-center justify-center w-[34px] h-[34px] rounded-[9px] text-white text-[13px] font-bold leading-none flex-none ${p.bg}`}
-      aria-hidden="true"
-    >
-      {p.short}
-    </span>
-  );
-}
 
 function SubmitButton({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
@@ -248,7 +238,7 @@ export default function NewPostView({ accounts, defaultTopic = "" }: { accounts:
                 return (
                   <div key={platform} className="flex items-center gap-3 px-3.5 py-3 border border-border rounded-xl min-h-[60px]">
                     <span className="w-5" aria-hidden="true" />
-                    <PlatformTile platform={platform} />
+                    <PlatformBadge platform={platform} size="lg" />
                     <span className="flex-1">
                       <strong>{p.label}</strong>
                       <span className={`${hintClass} block`}>Not connected</span>
@@ -270,7 +260,7 @@ export default function NewPostView({ accounts, defaultTopic = "" }: { accounts:
                     checked={checked}
                     onChange={() => toggle(platform)}
                   />
-                  <PlatformTile platform={platform} />
+                  <PlatformBadge platform={platform} size="lg" />
                   <span className="flex-1">
                     <strong>{p.label}</strong>
                     <span className={`block font-normal text-[13px] ${account.status === "reconnect" ? "text-error" : "text-muted"}`}>

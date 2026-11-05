@@ -204,7 +204,7 @@ export default async function HomePage() {
             return (
               <Link
                 key={post.id}
-                href={failed ? "/approvals" : `/post/${post.id}`}
+                href={postLink(post) === `/post/${post.id}` ? `/post/${post.id}` : "/approvals"}
                 className="flex flex-wrap items-center gap-3.5 py-3.5 border-t border-divider no-underline text-ink hover:text-ink hover:bg-white/40"
               >
                 <PlatformBadge platform={post.platforms[0]} />
