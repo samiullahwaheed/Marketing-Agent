@@ -725,6 +725,89 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "32ced3f2-054d-55d1-b09c-f95c368a1351",
+              "leftValue": "={{ Boolean($json.imageUrl) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "29158ead-76b5-5179-a73b-94500c48d2f7",
+      "name": "LinkedIn Has Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1580,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.imageUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "51106f53-155f-5409-aab1-c85a34abfefe",
+      "name": "Download Image for LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        600
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "person": "nM2WnL56sa",
+        "text": "={{ $('Platform Router').item.json.message }}",
+        "shareMediaCategory": "IMAGE",
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "visibility": "PUBLIC"
+        }
+      },
+      "id": "d81010aa-d912-5346-a4d3-57e6620140ed",
+      "name": "Publish LinkedIn (Image)",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [
+        2020,
+        600
+      ],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "grEjxSsdp6QTs1BJ",
+          "name": "LinkedIn account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
         "person": "nM2WnL56sa",
         "text": "={{ $json.message }}",
         "additionalFields": {
@@ -736,8 +819,8 @@
       "type": "n8n-nodes-base.linkedIn",
       "typeVersion": 1,
       "position": [
-        1580,
-        700
+        1800,
+        760
       ],
       "credentials": {
         "linkedInOAuth2Api": {
@@ -1299,7 +1382,7 @@
       "main": [
         [
           {
-            "node": "Publish LinkedIn",
+            "node": "LinkedIn Has Image?",
             "type": "main",
             "index": 0
           }
@@ -1314,6 +1397,35 @@
         [
           {
             "node": "Publish Facebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn Has Image?": {
+      "main": [
+        [
+          {
+            "node": "Download Image for LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Publish LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Image for LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Publish LinkedIn (Image)",
             "type": "main",
             "index": 0
           }
@@ -1372,6 +1484,17 @@
       ]
     },
     "Publish LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Normalize Publish Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish LinkedIn (Image)": {
       "main": [
         [
           {
