@@ -3,6 +3,7 @@
 import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { LiveRefresh } from "./LiveRefresh";
 import Sidebar from "./Sidebar";
 import { Logo } from "./Logo";
 
@@ -27,6 +28,7 @@ export default function AppLayout({
 
   return (
     <div className="min-h-screen lg:flex">
+      <LiveRefresh />
       <aside className="hidden lg:block w-60 flex-none bg-white/50 backdrop-blur-xl backdrop-saturate-150 border-r border-white/55">
         <div className="sticky top-0 max-h-screen overflow-y-auto">
           <Sidebar {...sidebarProps} />

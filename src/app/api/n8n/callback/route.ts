@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPostById, updatePost } from "@/lib/db";
-import { getSupabase } from "@/lib/supabase";
+import { getSupabase, notifyDashboard } from "@/lib/supabase";
 import type { Platform, PlatformContent, PlatformResult, PostStatus } from "@/lib/types";
 
 // Called by the n8n workflow (1) once it has generated per-platform content
@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
     if (rpcError) {
       return NextResponse.json({ error: rpcError.message }, { status: 500 });
     }
+    await notifyDashboard();
     return NextResponse.json({ ok: true });
   }
 
@@ -92,5 +93,6 @@ export async function POST(req: NextRequest) {
     lastError: error || (nextStatus === "failed" ? existing.lastError : null),
   });
 
+  await notifyDashboard();
   return NextResponse.json({ ok: true });
 }

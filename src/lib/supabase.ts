@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { DASHBOARD_CHANNEL, POSTS_CHANGED_EVENT } from "./realtime";
 
 export const IMAGE_BUCKET = "post-images";
 
@@ -78,4 +79,27 @@ export async function createImageUploadTarget(postId: string): Promise<ImageUplo
     publicUrl: supabase.storage.from(IMAGE_BUCKET).getPublicUrl(path).data.publicUrl,
     path,
   };
+}
+
+/**
+ * Tells every open dashboard to re-fetch (see <LiveRefresh />). Called when n8n reports
+ * a finished draft or a publish result. Never throws: a missed ping only means a stale view.
+ */
+export async function notifyDashboard(): Promise<void> {
+  if (!url || !serviceRoleKey) return;
+  try {
+    await fetch(`${url}/realtime/v1/api/broadcast`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        apikey: serviceRoleKey,
+        authorization: `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        messages: [{ topic: DASHBOARD_CHANNEL, event: POSTS_CHANGED_EVENT, payload: {} }],
+      }),
+    });
+  } catch {
+    // Ignore: the callback itself already succeeded.
+  }
 }
