@@ -37,18 +37,18 @@ function Hero() {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{ next?: string }>;
 }) {
-  const { error, next } = await searchParams;
+  const { next } = await searchParams;
 
   return (
     <AuthLayout hero={<Hero />} heroBasis="480px" formBasis="440px">
       <div className="w-full max-w-[420px] flex flex-col gap-6">
         <div className="flex flex-col gap-1.5">
-          <h2 className="heading text-4xl">Welcome back</h2>
-          <p className="m-0 text-muted text-base">Enter the dashboard password to continue.</p>
+          <h2 className="heading display text-4xl">Welcome back</h2>
+          <p className="m-0 text-muted text-base">Sign in to review drafts and see what went live.</p>
         </div>
-        <LoginForm error={!!error} next={next || "/"} />
+        <LoginForm next={next || "/"} />
       </div>
     </AuthLayout>
   );

@@ -4,16 +4,18 @@ import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { LiveRefresh } from "./LiveRefresh";
-import Sidebar from "./Sidebar";
+import Sidebar, { type SidebarUser } from "./Sidebar";
 import { Logo } from "./Logo";
 
 export default function AppLayout({
   children,
+  user,
   hasActivityAlert,
   aiCreditsPercent,
   aiCreditsPostsLeft,
 }: {
   children: React.ReactNode;
+  user: SidebarUser | null;
   hasActivityAlert: number;
   aiCreditsPercent: number;
   aiCreditsPostsLeft: number;
@@ -31,10 +33,16 @@ export default function AppLayout({
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen]);
 
-  const sidebarProps = { hasActivityAlert, aiCreditsPercent, aiCreditsPostsLeft };
+  const sidebarProps = { user, hasActivityAlert, aiCreditsPercent, aiCreditsPostsLeft };
 
   return (
-    <div className="min-h-screen lg:flex">
+    <div className="min-h-dvh lg:flex">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-[10px] focus:bg-ink focus:text-white focus:px-4 focus:py-2.5 focus:font-bold focus:no-underline"
+      >
+        Skip to content
+      </a>
       <LiveRefresh />
       {/* Heavier material for the structural region; content stays the lighter layer. */}
       <aside className="hidden lg:block w-60 flex-none bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border-r border-white/60 shadow-[1px_0_0_rgb(23_32_28/0.04)]">
@@ -81,7 +89,7 @@ export default function AppLayout({
         </div>
       </header>
 
-      <main className="flex-1 min-w-0 pt-10 pb-16 px-[clamp(20px,4vw,48px)]">
+      <main id="main" tabIndex={-1} className="flex-1 min-w-0 pt-10 pb-16 px-[clamp(20px,4vw,48px)] focus:outline-none">
         {/* Keyed by route so each page settles in once on arrival; live refreshes don't replay it. */}
         <div key={pathname} className="page-in">
           {children}

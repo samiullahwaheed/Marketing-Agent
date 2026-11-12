@@ -1,37 +1,60 @@
 "use client";
 
-import { useState } from "react";
-import { PasswordInput } from "@/components/AuthLayout";
-import { loginAction } from "./actions";
+import Link from "next/link";
+import { useActionState, useEffect, useRef } from "react";
+import { Field, FormAlert, PasswordInput, SubmitButton, TextInput } from "@/components/AuthForm";
+import { type AuthFormState, loginAction } from "./actions";
 
-const authInput =
-  "w-full min-h-12 px-3.5 py-[11px] border border-control rounded-[10px] text-[15px] leading-[1.4] text-ink bg-white/85 font-sans transition-[border-color,box-shadow] duration-150 ease-out focus:outline-none focus:border-primary focus:shadow-[0_0_0_4px_rgb(31_92_70/0.14)]";
-const fieldLabel = "flex flex-col gap-1.5 font-semibold text-sm";
+export default function LoginForm({ next }: { next: string }) {
+  const [state, formAction, pending] = useActionState<AuthFormState, FormData>(loginAction, {});
+  const formRef = useRef<HTMLFormElement>(null);
+  const alertRef = useRef<HTMLDivElement>(null);
 
-export default function LoginForm({ error, next }: { error: boolean; next: string }) {
-  const [password, setPassword] = useState("");
+  useEffect(() => {
+    if (state.message) alertRef.current?.focus();
+    else if (state.errors) formRef.current?.querySelector<HTMLInputElement>("[aria-invalid='true']")?.focus();
+  }, [state]);
 
   return (
-    <form action={loginAction} className="flex flex-col gap-4">
+    <form ref={formRef} action={formAction} noValidate className="flex flex-col gap-[18px]">
       <input type="hidden" name="next" value={next} />
-      <label className={fieldLabel}>
-        Password
-        <PasswordInput
-          className={authInput}
-          name="password"
-          value={password}
-          onChange={setPassword}
-          placeholder="Your password"
-          autoComplete="current-password"
-        />
-      </label>
-      {error && <p className="m-0 text-sm text-error font-semibold">That password isn&apos;t right. Try again.</p>}
-      <button
-        type="submit"
-        className="press w-full min-h-[52px] rounded-[10px] border border-primary bg-primary text-white text-base font-semibold cursor-pointer select-none shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(23_32_28/0.18)] hover:bg-primary-hover"
-      >
-        Sign in
-      </button>
+      <FormAlert message={state.message} alertRef={alertRef} />
+
+      <Field label="Email" error={state.errors?.email}>
+        {(a) => (
+          <TextInput
+            {...a}
+            name="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="you@company.com"
+            // Uncontrolled + key: React resets the form after an action, so re-seed what was typed.
+            key={state.values?.email ?? ""}
+            defaultValue={state.values?.email}
+            autoFocus
+            required
+          />
+        )}
+      </Field>
+
+      <Field label="Password" error={state.errors?.password}>
+        {(a) => <PasswordInput {...a} name="password" autoComplete="current-password" placeholder="Your password" required />}
+      </Field>
+
+      <div className="flex flex-col gap-3 pt-1">
+        <SubmitButton pending={pending} pendingLabel="Signing in…">
+          Sign in
+        </SubmitButton>
+        <p className="m-0 text-center text-sm text-muted">
+          New to the team?{" "}
+          <Link href="/signup" className="font-bold">
+            Create an account
+          </Link>
+        </p>
+      </div>
     </form>
   );
 }

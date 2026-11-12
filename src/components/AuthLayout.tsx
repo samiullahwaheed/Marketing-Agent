@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 function LogoOnGreen() {
   return (
@@ -35,7 +35,7 @@ export function AuthLayout({
   formBasis: string;
 }) {
   return (
-    <div className="flex flex-wrap min-h-screen">
+    <div className="flex flex-wrap min-h-dvh">
       <section
         className="bg-primary text-white pt-11 pb-12 px-[clamp(24px,5vw,72px)] flex flex-col gap-12 overflow-hidden"
         style={{ flex: `1 1 ${heroBasis}` }}
@@ -43,50 +43,9 @@ export function AuthLayout({
         <LogoOnGreen />
         {hero}
       </section>
-      <section className="flex items-center justify-center py-12 px-6" style={{ flex: `1 1 ${formBasis}` }}>
+      <main className="flex items-center justify-center py-12 px-6" style={{ flex: `1 1 ${formBasis}` }}>
         {children}
-      </section>
+      </main>
     </div>
-  );
-}
-
-export function PasswordInput({
-  value,
-  onChange,
-  placeholder,
-  autoComplete,
-  className,
-  name,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  autoComplete: string;
-  className: string;
-  name?: string;
-}) {
-  const [shown, setShown] = useState(false);
-  return (
-    <span className="relative block">
-      <input
-        className={`${className} pr-[76px]`}
-        type={shown ? "text" : "password"}
-        name={name}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        autoFocus
-        required
-      />
-      <button
-        type="button"
-        onClick={() => setShown((s) => !s)}
-        aria-label={shown ? "Hide password" : "Show password"}
-        className="absolute right-1.5 top-1.5 min-h-9 px-3 border-0 bg-transparent text-primary font-bold text-sm cursor-pointer"
-      >
-        {shown ? "Hide" : "Show"}
-      </button>
-    </span>
   );
 }

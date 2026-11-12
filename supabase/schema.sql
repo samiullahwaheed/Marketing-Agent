@@ -48,9 +48,20 @@ create table if not exists public.settings (
   banned_words text[] not null default '{}'
 );
 
+-- Dashboard users. Passwords are scrypt hashes made by the app (src/lib/password.ts);
+-- only the server, through the service role, ever reads this table.
+create table if not exists public.users (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text not null unique,
+  password_hash text not null,
+  created_at timestamptz not null default now()
+);
+
 alter table public.posts enable row level security;
 alter table public.accounts enable row level security;
 alter table public.settings enable row level security;
+alter table public.users enable row level security;
 
 -- Merges per-platform publish results atomically. n8n reports each platform
 -- in its own callback, often in parallel, so a read-modify-write in the app

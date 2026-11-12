@@ -52,13 +52,25 @@ function NavItem({
   );
 }
 
+export interface SidebarUser {
+  name: string;
+  email: string;
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
 export default function Sidebar({
   showLogo = true,
+  user,
   hasActivityAlert,
   aiCreditsPercent,
   aiCreditsPostsLeft,
 }: {
   showLogo?: boolean;
+  user: SidebarUser | null;
   hasActivityAlert: number;
   aiCreditsPercent: number;
   aiCreditsPostsLeft: number;
@@ -117,15 +129,40 @@ export default function Sidebar({
         </div>
       </div>
 
-      <form action={logoutAction}>
-        <button
-          type="submit"
-          className="press flex items-center gap-2.5 px-2 min-h-9 rounded-lg text-[13px] text-muted hover:text-ink hover:bg-[rgb(23_32_28/0.05)] border-0 bg-transparent cursor-pointer w-full"
-        >
-          <LogOut size={16} strokeWidth={1.8} aria-hidden="true" />
-          Sign out
-        </button>
-      </form>
+      {/* Who's signed in, with sign-out kept apart from the everyday nav. */}
+      <div className="flex items-center gap-2.5 border-t border-[rgb(23_32_28/0.08)] pt-4 px-1">
+        {user && (
+          <>
+            <span
+              aria-hidden="true"
+              className="flex-none w-9 h-9 rounded-full bg-primary text-white text-[13px] font-bold flex items-center justify-center"
+            >
+              {initials(user.name)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="font-bold text-sm truncate" title={user.name}>
+                {user.name}
+              </div>
+              <div className="text-[12.5px] text-muted truncate" title={user.email}>
+                {user.email}
+              </div>
+            </div>
+          </>
+        )}
+        <form action={logoutAction} className={user ? "flex-none" : "w-full"}>
+          <button
+            type="submit"
+            aria-label={user ? "Sign out" : undefined}
+            title="Sign out"
+            className={`press flex items-center justify-center gap-2.5 min-h-10 rounded-lg text-[13px] text-muted hover:text-ink hover:bg-[rgb(23_32_28/0.05)] border-0 bg-transparent cursor-pointer ${
+              user ? "w-10" : "w-full justify-start px-2"
+            }`}
+          >
+            <LogOut size={17} strokeWidth={1.8} aria-hidden="true" />
+            {!user && "Sign out"}
+          </button>
+        </form>
+      </div>
     </nav>
   );
 }
