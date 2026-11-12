@@ -143,9 +143,9 @@ export default async function HomePage() {
               <Link
                 key={post.id}
                 href={postLink(post)}
-                className={`${row} gap-3.5 text-ink no-underline hover:text-ink hover:bg-white/40`}
+                className={`${row} gap-3.5 text-ink no-underline transition-colors duration-150 hover:text-ink hover:bg-white/50`}
               >
-                <div className="w-[54px] text-center border border-white/55 rounded-[10px] py-[5px] flex-none bg-white/45 backdrop-blur-sm">
+                <div className="w-[54px] text-center border border-[rgb(23_32_28/0.06)] rounded-[10px] py-[5px] flex-none bg-white/80">
                   <div className="eyebrow text-[10.5px]">{shortDay(`${post.date}T00:00`)}</div>
                   <div className="heading text-[21px] leading-[1.1]">{new Date(`${post.date}T00:00`).getDate()}</div>
                 </div>
@@ -205,7 +205,7 @@ export default async function HomePage() {
               <Link
                 key={post.id}
                 href={postLink(post) === `/post/${post.id}` ? `/post/${post.id}` : "/approvals"}
-                className="flex flex-wrap items-center gap-3.5 py-3.5 border-t border-divider no-underline text-ink hover:text-ink hover:bg-white/40"
+                className="flex flex-wrap items-center gap-3.5 py-3.5 border-t border-divider no-underline text-ink transition-colors duration-150 hover:text-ink hover:bg-white/50"
               >
                 <PlatformBadge platform={post.platforms[0]} />
                 <div className="flex-[1_1_220px] min-w-0">

@@ -97,7 +97,7 @@ export default function CalendarView({ posts, reconnectPlatforms }: { posts: Pos
     <div className="flex flex-col gap-6 max-w-[1180px] mx-auto">
       <header className="flex flex-wrap gap-4 items-end justify-between">
         <div className="flex flex-col gap-1.5">
-          <h1 className="heading text-[34px] sm:text-[42px] leading-[1.08]">Calendar</h1>
+          <h1 className="heading display text-[34px] sm:text-[42px]">Calendar</h1>
           <p className="m-0 text-muted text-[17px]">Click a post to open it. Drag one to a new day to reschedule.</p>
         </div>
         <div className="flex flex-wrap gap-2.5 items-center">
@@ -112,15 +112,21 @@ export default function CalendarView({ posts, reconnectPlatforms }: { posts: Pos
               <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
             </Button>
           </div>
-          <div className="flex border border-control rounded-[10px] overflow-hidden">
+          {/* Segmented control: the thumb slides between options instead of colours swapping. */}
+          <div className="relative grid grid-cols-2 p-[3px] rounded-[11px] bg-[rgb(23_32_28/0.07)]">
+            <span
+              aria-hidden="true"
+              className="absolute top-[3px] bottom-[3px] left-[3px] w-[calc(50%-3px)] rounded-[8px] bg-white shadow-[0_1px_2px_rgb(23_32_28/0.12),0_2px_8px_rgb(23_32_28/0.08)] transition-transform duration-[var(--duration-spring)] ease-[var(--ease-spring)]"
+              style={{ transform: view === "month" ? "translateX(100%)" : "none" }}
+            />
             {(["week", "month"] as const).map((v) => (
               <button
                 key={v}
                 type="button"
                 aria-pressed={view === v}
                 onClick={() => setView(v)}
-                className={`min-h-[42px] px-3.5 border-0 text-sm font-semibold cursor-pointer ${
-                  view === v ? "bg-ink text-white" : "bg-card text-ink hover:bg-page"
+                className={`relative min-h-9 px-4 border-0 bg-transparent text-sm cursor-pointer select-none transition-colors duration-150 ${
+                  view === v ? "text-ink font-bold" : "text-muted font-semibold hover:text-ink"
                 }`}
               >
                 {v === "week" ? "Week" : "Month"}

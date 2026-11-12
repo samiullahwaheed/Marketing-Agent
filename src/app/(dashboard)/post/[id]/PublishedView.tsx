@@ -70,7 +70,7 @@ export default function PublishedView({ post }: { post: Post }) {
             {post.platforms.map((p) => PLATFORMS[p].label).join(" + ")} · {formatDayMonthTime(post.date, post.time)}
           </span>
         </div>
-        <h1 className="heading text-[32px] sm:text-[38px] leading-[1.08]">{post.topic}</h1>
+        <h1 className="heading display text-[32px] sm:text-[38px]">{post.topic}</h1>
       </header>
 
       <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))]">

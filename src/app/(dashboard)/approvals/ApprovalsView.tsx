@@ -121,7 +121,7 @@ export default function ApprovalsView({
               placeholder="Search posts"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full min-h-11 py-2.5 pr-3.5 pl-[42px] border border-control rounded-[10px] text-[15px] bg-white/70 backdrop-blur-sm"
+              className="w-full min-h-11 py-2.5 pr-3.5 pl-[42px] border border-control rounded-[10px] text-[15px] bg-white/85 transition-[border-color,box-shadow] duration-150 ease-out hover:border-[#B5BCB3] focus:outline-none focus:border-primary focus:shadow-[0_0_0_4px_rgb(31_92_70/0.14)]"
             />
           </label>
         }
@@ -241,7 +241,7 @@ export default function ApprovalsView({
               <Link
                 key={post.id}
                 href={postLink(post)}
-                className={`${row} ${i === 0 ? "border-t-0" : ""} text-ink no-underline hover:text-ink hover:bg-white/40`}
+                className={`${row} ${i === 0 ? "border-t-0" : ""} text-ink no-underline transition-colors duration-150 hover:text-ink hover:bg-white/50`}
               >
                 <span className="flex gap-1">
                   {post.platforms.map((p) => (

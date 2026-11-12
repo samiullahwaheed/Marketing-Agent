@@ -6,7 +6,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 export type ButtonVariant = "primary" | "secondary" | "danger" | "dangerOutline" | "ghost";
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-[10px] border font-semibold leading-none no-underline cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60";
+  "press inline-flex items-center justify-center gap-2 rounded-[10px] border font-semibold leading-none no-underline cursor-pointer whitespace-nowrap select-none disabled:cursor-not-allowed disabled:opacity-60";
 
 const sizes = {
   sm: "min-h-9 px-3 text-[13px]",
@@ -16,13 +16,18 @@ const sizes = {
 
 const variants: Record<ButtonVariant, string> = {
   // Solid — reserved for the one action a screen wants you to take.
-  primary: "border-primary bg-primary text-white hover:bg-primary-hover hover:border-primary-hover hover:text-white",
-  danger: "border-danger bg-danger text-white hover:bg-danger-hover hover:border-danger-hover hover:text-white",
-  // Glass — everything else sits on frosted, translucent ground.
-  secondary: "border-white/60 bg-white/50 backdrop-blur-md text-ink hover:bg-white/75 hover:text-ink",
-  dangerOutline: "border-[#E3BDB7]/80 bg-white/50 backdrop-blur-md text-danger hover:bg-white/75 hover:text-danger",
+  primary:
+    "border-primary bg-primary text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(23_32_28/0.18)] hover:bg-primary-hover hover:border-primary-hover hover:text-white",
+  danger:
+    "border-danger bg-danger text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(23_32_28/0.18)] hover:bg-danger-hover hover:border-danger-hover hover:text-white",
+  // Buttons usually sit on a glass card, so they are near-solid rather than another
+  // translucent layer — stacked light glass loses legibility.
+  secondary:
+    "border-[rgb(23_32_28/0.09)] bg-white/85 text-ink shadow-[0_1px_2px_rgb(23_32_28/0.06)] hover:bg-white hover:text-ink",
+  dangerOutline:
+    "border-[#E3BDB7] bg-white/85 text-danger shadow-[0_1px_2px_rgb(23_32_28/0.06)] hover:bg-white hover:text-danger",
   // Text colour is inherited so callers can tint it (e.g. a red "Remove")
-  ghost: "border-transparent bg-transparent hover:bg-white/45 hover:backdrop-blur-md",
+  ghost: "border-transparent bg-transparent hover:bg-[rgb(23_32_28/0.05)]",
 };
 
 type Props = {

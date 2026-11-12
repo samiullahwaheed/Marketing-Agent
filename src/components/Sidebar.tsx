@@ -33,10 +33,11 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3 min-h-11 px-3 rounded-[10px] no-underline text-[15px] ${
+      aria-current={active ? "page" : undefined}
+      className={`press flex items-center gap-3 min-h-11 px-3 rounded-[10px] no-underline text-[15px] select-none ${
         active
-          ? "bg-primary-light text-primary-hover font-bold hover:text-primary-hover"
-          : "text-nav font-medium hover:bg-page hover:text-ink"
+          ? "bg-primary-light text-primary-hover font-bold shadow-[inset_0_0_0_1px_rgb(31_92_70/0.08)] hover:text-primary-hover"
+          : "text-nav font-medium hover:bg-[rgb(23_32_28/0.05)] hover:text-ink"
       }`}
     >
       <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
@@ -70,7 +71,7 @@ export default function Sidebar({
 
       <Link
         href="/new-post"
-        className="flex items-center justify-center gap-2 min-h-[46px] rounded-[10px] bg-primary text-white no-underline font-bold text-[15px] hover:bg-primary-hover hover:text-white"
+        className="press flex items-center justify-center gap-2 min-h-[46px] rounded-[10px] bg-primary text-white no-underline font-bold text-[15px] select-none shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(23_32_28/0.18),0_6px_16px_rgb(31_92_70/0.22)] hover:bg-primary-hover hover:text-white"
       >
         <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
         New post
@@ -93,7 +94,7 @@ export default function Sidebar({
         <NavItem href="/settings" icon={SlidersHorizontal} label="Settings" />
       </div>
 
-      <div className="border border-white/55 rounded-xl p-3.5 flex flex-col gap-2.5 bg-white/40 backdrop-blur-md">
+      <div className="border border-[rgb(23_32_28/0.06)] rounded-xl p-3.5 flex flex-col gap-2.5 bg-white/60">
         <div className="flex justify-between items-baseline gap-2">
           <span className="font-bold text-sm">AI credits</span>
           {low && <span className="text-[13px] text-warning font-semibold">Running low</span>}
@@ -106,7 +107,7 @@ export default function Sidebar({
           aria-valuemin={0}
           aria-valuemax={100}
         >
-          <div className="h-full bg-marigold" style={{ width: `${Math.max(0, Math.min(100, aiCreditsPercent))}%` }} />
+          <div className="h-full bg-marigold rounded-full transition-[width] duration-500 ease-out" style={{ width: `${Math.max(0, Math.min(100, aiCreditsPercent))}%` }} />
         </div>
         <div className="flex justify-between text-[13px] text-muted">
           <span>About {aiCreditsPostsLeft} posts left</span>
@@ -119,7 +120,7 @@ export default function Sidebar({
       <form action={logoutAction}>
         <button
           type="submit"
-          className="flex items-center gap-2.5 px-2 min-h-9 text-[13px] text-muted hover:text-ink border-0 bg-transparent cursor-pointer w-full"
+          className="press flex items-center gap-2.5 px-2 min-h-9 rounded-lg text-[13px] text-muted hover:text-ink hover:bg-[rgb(23_32_28/0.05)] border-0 bg-transparent cursor-pointer w-full"
         >
           <LogOut size={16} strokeWidth={1.8} aria-hidden="true" />
           Sign out

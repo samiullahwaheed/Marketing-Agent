@@ -23,7 +23,7 @@ import { StatusChip } from "@/components/StatusChip";
 import { Tabs } from "@/components/Tabs";
 
 const activeTag = "border border-[#A9CBB5] bg-[#EEF5F0] text-primary-hover";
-const suggestionTag = "border border-dashed border-[#9AA59E] bg-white/45 backdrop-blur-sm text-ink hover:bg-white/70";
+const suggestionTag = "press border border-dashed border-[#9AA59E] bg-white/70 text-ink hover:bg-white";
 const tagBase = "inline-flex items-center gap-1.5 min-h-9 px-3 rounded-full text-[13.5px] font-semibold cursor-pointer";
 
 export default function ReviewView({ post, accounts }: { post: Post; accounts: Account[] }) {
@@ -91,7 +91,7 @@ export default function ReviewView({ post, accounts }: { post: Post; accounts: A
         <span className="self-start">
           <StatusChip status={post.status} postNow={post.postNow} />
         </span>
-        <h1 className="heading text-[32px] sm:text-[38px] leading-[1.08]">{post.topic}</h1>
+        <h1 className="heading display text-[32px] sm:text-[38px]">{post.topic}</h1>
         <p className="m-0 text-muted text-base">
           Goes out <strong className="text-ink">{goesOutLabel(post)}</strong>
         </p>
@@ -133,7 +133,7 @@ export default function ReviewView({ post, accounts }: { post: Post; accounts: A
             </div>
           )}
 
-          <article className="bg-white/55 backdrop-blur-xl backdrop-saturate-150 border border-white/60 rounded-2xl px-[18px] pt-[18px] pb-3.5 flex flex-col gap-3 shadow-[0_8px_32px_rgba(23,32,28,0.10)]">
+          <article className="bg-white/60 backdrop-blur-xl backdrop-saturate-150 border border-white/70 rounded-2xl px-[18px] pt-[18px] pb-3.5 flex flex-col gap-3 shadow-[inset_0_1px_0_rgb(255_255_255/0.8),0_1px_2px_rgb(23_32_28/0.05),0_10px_32px_rgb(23_32_28/0.08)]">
             <div className="flex gap-2.5 items-center">
               <PlatformBadge platform={active} size="md" />
               <div>
@@ -280,7 +280,7 @@ export default function ReviewView({ post, accounts }: { post: Post; accounts: A
         </aside>
       </div>
 
-      <div className="bg-white/55 backdrop-blur-xl backdrop-saturate-150 border border-white/60 rounded-2xl px-[18px] py-3.5 flex flex-wrap gap-3 items-center justify-between shadow-[0_8px_32px_rgba(23,32,28,0.10)]">
+      <div className="action-bar px-[18px] py-3.5 flex flex-wrap gap-3 items-center justify-between">
         <div className="flex flex-wrap gap-2.5">
           <Button variant="dangerOutline" to={`/post/${post.id}/reject`}>
             <XIcon size={16} strokeWidth={2.4} aria-hidden="true" />

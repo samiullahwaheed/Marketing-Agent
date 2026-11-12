@@ -13,7 +13,8 @@ export function Card({
   children: ReactNode;
 }) {
   const base = glass
-    ? "bg-white/55 backdrop-blur-xl backdrop-saturate-150 border border-white/60 shadow-[0_8px_32px_rgba(23,32,28,0.10)]"
+    ? // Bright top edge = light catching the material; two-layer shadow reads as real depth.
+      "bg-white/60 backdrop-blur-xl backdrop-saturate-150 border border-white/70 shadow-[inset_0_1px_0_rgb(255_255_255/0.8),0_1px_2px_rgb(23_32_28/0.05),0_10px_32px_rgb(23_32_28/0.08)]"
     : "";
   return <Tag className={`${base} rounded-2xl ${className}`}>{children}</Tag>;
 }

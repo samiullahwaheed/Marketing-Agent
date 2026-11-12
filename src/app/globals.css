@@ -35,6 +35,11 @@
   --color-linkedin: #0A66C2;
   --color-instagram: #C13584;
   --color-facebook: #1877F2;
+
+  /* Critically damped spring (damping 1.0, response 0.35s) sampled for CSS. No overshoot,
+     and CSS transitions re-target from the current value, so hover/press stay interruptible. */
+  --ease-spring: linear(0, 0.075, 0.227, 0.39, 0.536, 0.656, 0.75, 0.821, 0.873, 0.911, 0.938, 0.957, 0.971, 0.98, 0.986, 0.991, 0.994, 0.996, 0.997, 0.998, 1);
+  --duration-spring: 500ms;
 }
 
 @layer base {
@@ -55,18 +60,78 @@
   }
   a {
     color: var(--color-primary);
+    transition: color 150ms ease-out;
   }
   a:hover {
     color: var(--color-primary-hover);
   }
+  /* One focus ring everywhere, keyboard only. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
-/* Headings: Bricolage Grotesque, tight tracking */
+/* Headings: Bricolage Grotesque. Tracking tightens as size grows (see .display). */
 @utility heading {
   font-family: var(--font-heading);
   font-weight: 700;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.018em;
+  font-optical-sizing: auto;
   margin: 0;
+}
+
+/* Page titles: large text wants tighter tracking and leading. */
+@utility display {
+  letter-spacing: -0.032em;
+  line-height: 1.04;
+}
+
+/* Feedback on pointer-down, not release: a quick press-in, spring back on release. */
+@utility press {
+  transition:
+    transform var(--duration-spring) var(--ease-spring),
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out,
+    box-shadow 150ms ease-out;
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+    transition-duration: 90ms, 150ms, 150ms, 150ms, 150ms;
+    transition-timing-function: ease-out;
+  }
+}
+
+/* Floating translucent toolbar that stays in reach while the page scrolls under it. */
+@utility action-bar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 10;
+  border-radius: 16px;
+  border: 1px solid rgb(255 255 255 / 0.7);
+  background: rgb(255 255 255 / 0.72);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    0 1px 2px rgb(23 32 28 / 0.06),
+    0 12px 40px rgb(23 32 28 / 0.14);
+}
+
+/* Content arriving on navigation: a short fade-and-settle, nothing that slides far. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@utility page-in {
+  /* backwards, not both: once settled the wrapper holds no transform, so fixed children
+     and sticky bars behave normally. */
+  animation: page-in 420ms var(--ease-spring) backwards;
 }
 
 /* Small uppercase label above titles and in date boxes */
@@ -87,4 +152,47 @@
 ::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.15);
   border-radius: 9999px;
+}
+
+/* Reduced motion: keep colour/opacity feedback, drop movement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  .press:active:not(:disabled) {
+    transform: none;
+  }
+  /* A small spinner is status, not decoration: keep it. */
+  .animate-spin {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+/* Reduced transparency: frosted surfaces become solid. */
+@media (prefers-reduced-transparency: reduce) {
+  body {
+    background-image: none;
+  }
+  * {
+    backdrop-filter: none !important;
+  }
+  .action-bar {
+    background: var(--color-card);
+  }
+}
+
+/* Higher contrast: glass edges become real borders. */
+@media (prefers-contrast: more) {
+  [class*="border-white"] {
+    border-color: var(--color-control) !important;
+  }
+  .action-bar {
+    background: var(--color-card);
+    border-color: var(--color-control);
+  }
 }

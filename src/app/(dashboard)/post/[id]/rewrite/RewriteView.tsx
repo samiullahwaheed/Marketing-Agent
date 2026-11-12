@@ -125,7 +125,7 @@ export default function RewriteView({ post }: { post: Post }) {
         </section>
       </div>
 
-      <div className="bg-white/55 backdrop-blur-xl backdrop-saturate-150 border border-white/60 rounded-2xl px-[18px] py-3.5 flex flex-wrap gap-3 items-center justify-end">
+      <div className="action-bar px-[18px] py-3.5 flex flex-wrap gap-3 items-center justify-end">
         <span className="text-muted text-[13.5px] mr-auto">Your current version stays until the rewrite comes back.</span>
         <Button to={`/post/${post.id}/review`}>{requested ? "Back to post" : "Cancel"}</Button>
       </div>

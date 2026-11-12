@@ -24,23 +24,40 @@ export default function AppLayout({
   // eslint-disable-next-line react-hooks/set-state-in-effect -- closes the mobile menu on navigation
   useEffect(() => setMenuOpen(false), [pathname]);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+
   const sidebarProps = { hasActivityAlert, aiCreditsPercent, aiCreditsPostsLeft };
 
   return (
     <div className="min-h-screen lg:flex">
       <LiveRefresh />
-      <aside className="hidden lg:block w-60 flex-none bg-white/50 backdrop-blur-xl backdrop-saturate-150 border-r border-white/55">
+      {/* Heavier material for the structural region; content stays the lighter layer. */}
+      <aside className="hidden lg:block w-60 flex-none bg-white/55 backdrop-blur-2xl backdrop-saturate-150 border-r border-white/60 shadow-[1px_0_0_rgb(23_32_28/0.04)]">
         <div className="sticky top-0 max-h-screen overflow-y-auto">
           <Sidebar {...sidebarProps} />
         </div>
       </aside>
 
-      <header className="lg:hidden sticky top-0 z-20 bg-white/60 backdrop-blur-xl backdrop-saturate-150 border-b border-white/55">
+      {/* Dim to focus: the open menu is a modal task, so the page behind steps back. */}
+      <div
+        aria-hidden="true"
+        onClick={() => setMenuOpen(false)}
+        className={`lg:hidden fixed inset-0 z-10 bg-[rgb(23_32_28/0.28)] transition-opacity duration-300 ease-out ${
+          menuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      />
+
+      <header className="lg:hidden sticky top-0 z-20 bg-white/65 backdrop-blur-2xl backdrop-saturate-150 border-b border-white/60">
         <div className="flex items-center justify-between h-16 px-4">
           <Logo />
           <button
             type="button"
-            className="w-11 h-11 flex items-center justify-center rounded-[10px] border border-white/60 bg-white/50 backdrop-blur-md text-ink cursor-pointer hover:bg-white/75"
+            className="press w-11 h-11 flex items-center justify-center rounded-[10px] border border-[rgb(23_32_28/0.09)] bg-white/85 text-ink cursor-pointer hover:bg-white"
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
             aria-controls="mobile-menu"
@@ -49,14 +66,27 @@ export default function AppLayout({
             {menuOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
           </button>
         </div>
-        {menuOpen && (
-          <div id="mobile-menu" className="bg-white/60 backdrop-blur-xl backdrop-saturate-150 border-t border-white/55 max-h-[calc(100vh-4rem)] overflow-y-auto">
-            <Sidebar showLogo={false} {...sidebarProps} />
+        {/* The sheet grows down out of the header that opened it, and closes back up the same way. */}
+        <div
+          id="mobile-menu"
+          inert={!menuOpen}
+          className="grid transition-[grid-template-rows,opacity] duration-[var(--duration-spring)] ease-[var(--ease-spring)]"
+          style={{ gridTemplateRows: menuOpen ? "1fr" : "0fr", opacity: menuOpen ? 1 : 0 }}
+        >
+          <div className="overflow-hidden">
+            <div className="border-t border-white/60 max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain">
+              <Sidebar showLogo={false} {...sidebarProps} />
+            </div>
           </div>
-        )}
+        </div>
       </header>
 
-      <main className="flex-1 min-w-0 pt-10 pb-16 px-[clamp(20px,4vw,48px)]">{children}</main>
+      <main className="flex-1 min-w-0 pt-10 pb-16 px-[clamp(20px,4vw,48px)]">
+        {/* Keyed by route so each page settles in once on arrival; live refreshes don't replay it. */}
+        <div key={pathname} className="page-in">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

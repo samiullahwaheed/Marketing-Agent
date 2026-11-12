@@ -38,10 +38,10 @@ function Segment({ on, onClick, children }: { on: boolean; onClick: () => void; 
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      className={`flex-[1_1_120px] min-h-[46px] px-3 py-2 border rounded-[10px] text-sm font-semibold text-left cursor-pointer ${
+      className={`press flex-[1_1_120px] min-h-[46px] px-3 py-2 border rounded-[10px] text-sm font-semibold text-left cursor-pointer select-none ${
         on
           ? "bg-primary-light border-primary text-primary-hover shadow-[inset_0_0_0_1px_#1F5C46]"
-          : "bg-white/50 backdrop-blur-md border-control text-ink hover:bg-white/75"
+          : "bg-white/85 border-control text-ink hover:bg-white hover:border-[#B5BCB3]"
       }`}
     >
       {children}
@@ -56,7 +56,7 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
     <button
       type="submit"
       disabled={disabled || pending}
-      className="w-full min-h-[54px] inline-flex items-center justify-center gap-2 rounded-[10px] border border-primary bg-primary text-white text-base font-semibold cursor-pointer hover:bg-primary-hover disabled:opacity-70 disabled:cursor-wait"
+      className="press w-full min-h-[54px] inline-flex items-center justify-center gap-2 rounded-[10px] border border-primary bg-primary text-white text-base font-semibold cursor-pointer select-none shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(23_32_28/0.18),0_8px_20px_rgb(31_92_70/0.2)] hover:bg-primary-hover disabled:opacity-70 disabled:cursor-wait"
     >
       {pending ? (
         <>

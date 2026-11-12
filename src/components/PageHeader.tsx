@@ -22,7 +22,7 @@ export function PageHeader({
     <header className="flex flex-wrap gap-4 items-end justify-between">
       <div className="flex flex-col gap-1.5">
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-        <h1 className={`heading leading-[1.08] ${sizes[size].title}`}>{title}</h1>
+        <h1 className={`heading display ${sizes[size].title}`}>{title}</h1>
         {subtitle && <p className={`m-0 text-muted ${sizes[size].subtitle}`}>{subtitle}</p>}
       </div>
       {actions}
