@@ -87,3 +87,4 @@ live in Supabase Storage.
   credentials live in n8n.
 - **Strategic Insights, Plan, and Audiences** — intentionally remain prototype screens using
   illustrative data; they are not inputs to or outputs from the n8n workflow.
+
