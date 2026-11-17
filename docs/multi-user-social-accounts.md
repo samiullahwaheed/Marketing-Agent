@@ -1,6 +1,6 @@
 # Multi-user social accounts
 
-**Status:** Planned, not started
+**Status:** Code done (steps 1–9). Waiting on the owner's tasks in section 6 and the migration `supabase/migrations/002_multi_user.sql`; then step 10 (end-to-end test).
 **Goal:** Anyone can sign up, connect their own LinkedIn, Facebook and Instagram in Settings, and post to *their* accounts. One dashboard and one n8n agent serve every user.
 
 ---

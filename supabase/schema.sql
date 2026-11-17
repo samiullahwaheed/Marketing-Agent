@@ -1,8 +1,19 @@
 
 create extension if not exists pgcrypto;
 
+-- Dashboard users. Passwords are scrypt hashes made by the app (src/lib/password.ts);
+-- only the server, through the service role, ever reads this table.
+create table if not exists public.users (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text not null unique,
+  password_hash text not null,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.posts (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users (id) on delete cascade,
   topic text not null,
   post_date text not null,                 -- "2026-11-04" (author's local date)
   post_time text not null,                 -- "09:00"     (author's local time)
@@ -29,37 +40,38 @@ create table if not exists public.posts (
   updated_at timestamptz not null default now()
 );
 
+create index if not exists posts_user_idx on public.posts (user_id, updated_at desc);
 create index if not exists posts_status_idx on public.posts (status);
 create index if not exists posts_date_idx on public.posts (post_date, post_time);
 create index if not exists posts_updated_idx on public.posts (updated_at desc);
 
-create table if not exists public.accounts (
-  platform text primary key check (platform in ('linkedin', 'instagram', 'facebook')),
-  label text not null,
-  status text not null default 'connected' check (status in ('connected', 'reconnect', 'not_connected')),
-  updated_at timestamptz not null default now()
+-- Each user's connected social accounts. access_token is AES-256-GCM ciphertext
+-- (src/lib/crypto.ts); the key lives only in the app's TOKEN_ENCRYPTION_KEY env var.
+create table if not exists public.social_connections (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users (id) on delete cascade,
+  platform text not null check (platform in ('linkedin', 'instagram', 'facebook')),
+  account_id text not null,          -- Facebook Page id, Instagram user id, or LinkedIn person URN
+  account_name text not null,
+  access_token text not null,
+  expires_at timestamptz,            -- null = does not expire (Facebook Page tokens)
+  status text not null default 'connected' check (status in ('connected', 'reconnect')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, platform)
 );
 
+-- One row per user; id is the user's uuid as text.
 create table if not exists public.settings (
-  id text primary key default 'global',
+  id text primary key,
   ai_credits_percent integer not null default 100,
   ai_credits_posts_left integer not null default 50,
   brand_voice jsonb not null default '{"tone":"","keywords":"","sampleText":"","doNots":""}'::jsonb,
   banned_words text[] not null default '{}'
 );
 
--- Dashboard users. Passwords are scrypt hashes made by the app (src/lib/password.ts);
--- only the server, through the service role, ever reads this table.
-create table if not exists public.users (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  email text not null unique,
-  password_hash text not null,
-  created_at timestamptz not null default now()
-);
-
 alter table public.posts enable row level security;
-alter table public.accounts enable row level security;
+alter table public.social_connections enable row level security;
 alter table public.settings enable row level security;
 alter table public.users enable row level security;
 

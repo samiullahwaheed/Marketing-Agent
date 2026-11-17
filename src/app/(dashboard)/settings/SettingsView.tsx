@@ -1,33 +1,28 @@
 "use client";
 
-import { useState, useTransition, type FormEvent } from "react";
-import { addBannedWordAction, reconnectAccountAction, removeBannedWordAction, saveBrandVoiceAction } from "@/lib/actions";
-import { PLATFORM_ORDER, PLATFORMS } from "@/lib/platforms";
+import { useState, type FormEvent } from "react";
+import { addBannedWordAction, removeBannedWordAction, saveBrandVoiceAction } from "@/lib/actions";
 import { inputClass } from "@/lib/ui";
 import type { Account, SettingsDoc } from "@/lib/types";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
-import { Chip } from "@/components/Chip";
 import { PageHeader } from "@/components/PageHeader";
-import { PlatformBadge } from "@/components/PlatformBadge";
 import { Pill } from "@/components/Pill";
+import { ConnectedAccounts } from "./ConnectedAccounts";
 
-const row = "flex flex-wrap items-center gap-3.5 py-3.5 border-t border-divider";
-
-
-export default function SettingsView({ accounts, settings }: { accounts: Account[]; settings: SettingsDoc }) {
+export default function SettingsView({
+  accounts,
+  settings,
+  connected,
+  connectError,
+}: {
+  accounts: Account[];
+  settings: SettingsDoc;
+  connected?: string;
+  connectError?: string;
+}) {
   const [bannedWords, setBannedWords] = useState(settings.bannedWords ?? []);
   const [newWord, setNewWord] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
-  const [reconnecting, setReconnecting] = useState<string | null>(null);
-
-  function connect(platform: Account["platform"]) {
-    setReconnecting(platform);
-    startTransition(() => {
-      void reconnectAccountAction(platform).finally(() => setReconnecting(null));
-    });
-  }
-
   function addWord(e: FormEvent) {
     e.preventDefault();
     const word = newWord?.trim().toLowerCase();
@@ -51,46 +46,7 @@ export default function SettingsView({ accounts, settings }: { accounts: Account
 
       <div className="grid gap-[22px] items-start grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))]">
         <div className="flex flex-col gap-[22px]">
-          <Card className="px-6 pt-5 pb-2">
-            <h2 className="heading text-xl pb-2">Connected accounts</h2>
-            {PLATFORM_ORDER.map((platform) => {
-              const acc = accounts.find((a) => a.platform === platform);
-              const status = acc?.status ?? "not_connected";
-              const label = PLATFORMS[platform].label;
-              const pending = reconnecting === platform;
-
-              if (status === "reconnect") {
-                return (
-                  <div key={platform} className={`${row} bg-[#FDF6F5] -mx-6 px-6`}>
-                    <PlatformBadge platform={platform} size="lg" />
-                    <div className="flex-[1_1_160px]">
-                      <strong>{label}</strong>
-                      <div className="text-[13.5px] text-error">Login expired · reconnect to resume posting</div>
-                    </div>
-                    <Button variant="primary" size="sm" className="min-h-[38px]" onClick={() => connect(platform)} disabled={pending}>
-                      {pending ? "Reconnecting…" : "Reconnect"}
-                    </Button>
-                  </div>
-                );
-              }
-              return (
-                <div key={platform} className={row}>
-                  <PlatformBadge platform={platform} size="lg" />
-                  <div className="flex-[1_1_160px]">
-                    <strong>{label}</strong>
-                    <div className="text-muted text-[13.5px]">{status === "connected" ? "Connected" : "Not connected"}</div>
-                  </div>
-                  {status === "connected" ? (
-                    <Chip tone="success">Connected</Chip>
-                  ) : (
-                    <Button size="sm" className="min-h-[38px]" onClick={() => connect(platform)} disabled={pending}>
-                      {pending ? "Connecting…" : "Connect"}
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
-          </Card>
+          <ConnectedAccounts accounts={accounts} connected={connected} connectError={connectError} />
 
           <Card className="px-6 py-5 flex flex-col gap-3.5">
             <h2 className="heading text-xl">AI credits</h2>

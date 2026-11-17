@@ -1,6 +1,7 @@
-// Seeds Supabase with sample data so the dashboard looks populated on first run.
-// Usage: npm run seed   (run supabase/schema.sql in the SQL editor first)
-// Safe to re-run: only inserts posts if the "posts" table is currently empty.
+// Seeds sample posts into one user's dashboard so it looks populated on first run.
+// Usage: npm run seed -- you@company.com   (sign up first; run supabase/schema.sql before that)
+// Safe to re-run: only inserts posts if that user has none yet.
+// Connected accounts aren't seeded: those come from Settings → Connected accounts.
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.SUPABASE_URL;
@@ -32,8 +33,9 @@ function isoAt(days, hh, mm) {
   return d.toISOString();
 }
 
-function toRow(doc) {
+function toRow(userId, doc) {
   return {
+    user_id: userId,
     topic: doc.topic,
     post_date: doc.date,
     post_time: doc.time,
@@ -54,30 +56,26 @@ function toRow(doc) {
 }
 
 async function main() {
-  const { count: accountCount } = await supabase.from("accounts").select("platform", { count: "exact", head: true });
-  if (!accountCount) {
-    check(
-      await supabase.from("accounts").upsert([
-        { platform: "linkedin", label: "LinkedIn", status: "connected" },
-        { platform: "instagram", label: "Instagram", status: "connected" },
-        { platform: "facebook", label: "Facebook", status: "connected" },
-      ]),
-      "Seeding accounts"
-    );
-    console.log("Seeded accounts");
-  }
+  const email = (process.argv[2] || "").trim().toLowerCase();
+  if (!email) throw new Error("Pass the email of the account to seed: npm run seed -- you@company.com");
+  const { data: user, error: userError } = await supabase.from("users").select("id").eq("email", email).maybeSingle();
+  if (userError) throw new Error(`Finding user: ${userError.message}`);
+  if (!user) throw new Error(`No account for ${email}. Sign up on /signup first.`);
 
   check(
     await supabase
       .from("settings")
-      .upsert({ id: "global", ai_credits_percent: 12, ai_credits_posts_left: 6 }, { onConflict: "id", ignoreDuplicates: true }),
+      .upsert({ id: user.id, ai_credits_percent: 12, ai_credits_posts_left: 6 }, { onConflict: "id", ignoreDuplicates: true }),
     "Seeding settings"
   );
 
-  const { count: postCount, error } = await supabase.from("posts").select("id", { count: "exact", head: true });
+  const { count: postCount, error } = await supabase
+    .from("posts")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
   if (error) throw new Error(`Counting posts: ${error.message}`);
   if (postCount) {
-    console.log("posts table already has data — skipping post seed.");
+    console.log(`${email} already has posts — skipping post seed.`);
     return;
   }
 
@@ -245,7 +243,7 @@ async function main() {
     },
   ];
 
-  check(await supabase.from("posts").insert(docs.map(toRow)), "Seeding posts");
+  check(await supabase.from("posts").insert(docs.map((d) => toRow(user.id, d))), "Seeding posts");
   console.log(`Seeded ${docs.length} posts`);
 }
 

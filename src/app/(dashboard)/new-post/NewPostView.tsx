@@ -264,7 +264,7 @@ export default function NewPostView({ accounts, defaultTopic = "" }: { accounts:
                   <span className="flex-1">
                     <strong>{p.label}</strong>
                     <span className={`block font-normal text-[13px] ${account.status === "reconnect" ? "text-error" : "text-muted"}`}>
-                      {account.status === "reconnect" ? "Login expired" : "Connected"}
+                      {account.status === "reconnect" ? "Login expired" : account.accountName ?? "Connected"}
                     </span>
                   </span>
                 </label>

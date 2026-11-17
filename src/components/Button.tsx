@@ -35,8 +35,10 @@ type Props = {
   size?: keyof typeof sizes;
   /** Renders a Next.js link instead of a <button>. */
   to?: string;
-  /** Renders a plain external link. */
+  /** Renders a plain link (full page load), e.g. an external site or an API route that redirects. */
   href?: string;
+  /** For `href`: open in a new tab. Defaults to true. */
+  newTab?: boolean;
   className?: string;
   children: ReactNode;
 } & ButtonHTMLAttributes<HTMLButtonElement>;
@@ -46,6 +48,7 @@ export function Button({
   size = "md",
   to,
   href,
+  newTab = true,
   className = "",
   children,
   type = "button",
@@ -54,7 +57,7 @@ export function Button({
   const classes = `${base} ${sizes[size]} ${variants[variant]} ${className}`;
   if (href) {
     return (
-      <a href={href} target="_blank" rel="noreferrer" className={classes}>
+      <a href={href} {...(newTab ? { target: "_blank", rel: "noreferrer" } : {})} className={classes}>
         {children}
       </a>
     );

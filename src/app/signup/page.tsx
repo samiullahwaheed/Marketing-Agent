@@ -63,7 +63,9 @@ export default function SignupPage() {
       <div className="w-full max-w-[440px] flex flex-col gap-6">
         <div className="flex flex-col gap-1.5">
           <h2 className="heading display text-4xl">Create your account</h2>
-          <p className="m-0 text-muted text-base">It takes under a minute. You&rsquo;ll go straight to your dashboard.</p>
+          <p className="m-0 text-muted text-base">
+            It takes under a minute. Next, you&rsquo;ll connect the accounts you want to post to.
+          </p>
         </div>
         <SignupForm />
       </div>

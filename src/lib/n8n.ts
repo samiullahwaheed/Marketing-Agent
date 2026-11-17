@@ -1,3 +1,4 @@
+import type { PublishAccount } from "./connections";
 import type { ImageUploadTarget } from "./supabase";
 import type { Platform, PlatformContent, RewriteRequest } from "./types";
 
@@ -41,6 +42,12 @@ export interface PublishPostWebhookPayload {
   platforms: Platform[];
   content: Partial<Record<Platform, PlatformContent>>;
   imageUrl?: string;
+  /**
+   * The post owner's own connected accounts, one per platform in `platforms`.
+   * accountId is the Facebook Page id, Instagram user id, or LinkedIn person URN.
+   * Sent only to n8n over HTTPS with the x-api-key header; never to the browser.
+   */
+  accounts: Partial<Record<Platform, PublishAccount>>;
   callbackUrl: string;
 }
 

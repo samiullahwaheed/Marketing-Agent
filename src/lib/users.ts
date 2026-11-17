@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { SESSION_COOKIE, readSessionUserId } from "./auth";
 import { getSupabase, unwrap, unwrapOne } from "./supabase";
 
@@ -32,6 +33,16 @@ export async function createUser(name: string, email: string, passwordHash: stri
   // 23505 = unique_violation: two sign-ups for the same email raced.
   if (res.error?.code === "23505") return null;
   return unwrapOne(res, "Creating user") as User;
+}
+
+/**
+ * The signed-in user's id. The proxy already rejects requests without a valid session,
+ * so this only redirects if the cookie went bad between the proxy and here.
+ */
+export async function requireUserId(): Promise<string> {
+  const id = await readSessionUserId((await cookies()).get(SESSION_COOKIE)?.value);
+  if (!id) redirect("/login");
+  return id;
 }
 
 /** The signed-in user, or null for a session made before accounts existed. */

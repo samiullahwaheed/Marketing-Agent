@@ -1,20 +1,17 @@
 import "server-only";
 import { PLATFORM_ORDER } from "./platforms";
 import { getSupabase, unwrap, unwrapOne } from "./supabase";
-import type {
-  AccountDoc,
-  Account,
-  Platform,
-  PostDoc,
-  Post,
-  SettingsDoc,
-} from "./types";
+import type { Platform, PostDoc, Post, SettingsDoc } from "./types";
 
 // Column names in Postgres are snake_case; the app works in camelCase.
 // These mappers are the only place that knows both shapes.
+//
+// Every function takes the owner's user id and filters by it, so one user can never read
+// or change another's posts. The only unscoped access is for the n8n callback (`*AsSystem`).
 
 export interface PostRow {
   id: string;
+  user_id: string;
   topic: string;
   post_date: string;
   post_time: string;
@@ -53,6 +50,7 @@ function pickKnown<T>(map: Partial<Record<string, T>> | null | undefined): Parti
 export function serializePost(row: PostRow): Post {
   return {
     id: row.id,
+    userId: row.user_id,
     topic: row.topic,
     date: row.post_date,
     time: row.post_time,
@@ -81,6 +79,7 @@ export function serializePost(row: PostRow): Post {
 
 const POST_COLUMNS: Record<keyof Omit<PostDoc, "createdAt" | "updatedAt">, keyof PostRow> = {
   id: "id",
+  userId: "user_id",
   topic: "topic",
   date: "post_date",
   time: "post_time",
@@ -122,10 +121,22 @@ export async function insertPost(doc: PostDoc): Promise<string> {
   return row.id;
 }
 
-export async function updatePost(
-  id: string,
-  patch: { [K in keyof PostDoc]?: PostDoc[K] | null }
-): Promise<void> {
+type PostPatch = { [K in keyof Omit<PostDoc, "userId">]?: PostDoc[K] | null };
+
+/** Updates one of this user's posts. Owner can't be changed through a patch. */
+export async function updatePost(userId: string, id: string, patch: PostPatch): Promise<void> {
+  unwrap(
+    await getSupabase()
+      .from("posts")
+      .update({ ...toPostRow(patch), updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", userId),
+    "Could not update post"
+  );
+}
+
+/** For the n8n callback only, which is authenticated by its shared secret, not a user session. */
+export async function updatePostAsSystem(id: string, patch: PostPatch): Promise<void> {
   unwrap(
     await getSupabase()
       .from("posts")
@@ -135,12 +146,12 @@ export async function updatePost(
   );
 }
 
-export async function countPosts(filter: {
+export async function countPosts(userId: string, filter: {
   status?: PostDoc["status"] | PostDoc["status"][];
   platforms?: Platform[];
   updatedSince?: Date;
 }): Promise<number> {
-  let q = getSupabase().from("posts").select("id", { count: "exact", head: true });
+  let q = getSupabase().from("posts").select("id", { count: "exact", head: true }).eq("user_id", userId);
   if (Array.isArray(filter.status)) q = q.in("status", filter.status);
   else if (filter.status) q = q.eq("status", filter.status);
   if (filter.platforms) q = q.overlaps("platforms", filter.platforms);
@@ -148,54 +159,6 @@ export async function countPosts(filter: {
   const { count, error } = await q;
   if (error) throw new Error(`Could not count posts: ${error.message}`);
   return count ?? 0;
-}
-
-interface AccountRow {
-  platform: Platform;
-  label: string;
-  status: AccountDoc["status"];
-  updated_at: string;
-}
-
-export function serializeAccount(row: AccountRow): Account {
-  return {
-    id: row.platform,
-    platform: row.platform,
-    label: row.label,
-    status: row.status,
-    updatedAt: new Date(row.updated_at).toISOString(),
-  };
-}
-
-const DEFAULT_ACCOUNTS: Array<Pick<AccountDoc, "platform" | "label" | "status">> = [
-  { platform: "linkedin", label: "LinkedIn", status: "connected" },
-  { platform: "instagram", label: "Instagram", status: "connected" },
-  { platform: "facebook", label: "Facebook", status: "connected" },
-];
-
-export async function getAccounts(): Promise<Account[]> {
-  const supabase = getSupabase();
-  let rows = unwrap(await supabase.from("accounts").select("*"), "Could not load accounts") as AccountRow[];
-  if (rows.length === 0) {
-    rows = unwrap(
-      await supabase.from("accounts").upsert(DEFAULT_ACCOUNTS, { onConflict: "platform" }).select("*"),
-      "Could not create default accounts"
-    ) as AccountRow[];
-  }
-  return rows
-    .filter((r) => isKnownPlatform(r.platform))
-    .sort((a, b) => PLATFORM_ORDER.indexOf(a.platform) - PLATFORM_ORDER.indexOf(b.platform))
-    .map(serializeAccount);
-}
-
-export async function setAccountStatus(platform: Platform, status: AccountDoc["status"]): Promise<void> {
-  const label = DEFAULT_ACCOUNTS.find((a) => a.platform === platform)?.label ?? platform;
-  unwrap(
-    await getSupabase()
-      .from("accounts")
-      .upsert({ platform, label, status, updated_at: new Date().toISOString() }, { onConflict: "platform" }),
-    "Could not update account"
-  );
 }
 
 interface SettingsRow {
@@ -206,15 +169,16 @@ interface SettingsRow {
   banned_words: string[];
 }
 
-export async function getSettings(): Promise<SettingsDoc> {
+/** One settings row per user, keyed by the user id; created with defaults on first read. */
+export async function getSettings(userId: string): Promise<SettingsDoc> {
   const supabase = getSupabase();
   let row = unwrap(
-    await supabase.from("settings").select("*").eq("id", "global").maybeSingle(),
+    await supabase.from("settings").select("*").eq("id", userId).maybeSingle(),
     "Could not load settings"
   ) as SettingsRow | null;
   if (!row) {
     row = unwrap(
-      await supabase.from("settings").upsert({ id: "global" }, { onConflict: "id" }).select("*").single(),
+      await supabase.from("settings").upsert({ id: userId }, { onConflict: "id" }).select("*").single(),
       "Could not create settings"
     ) as SettingsRow;
   }
@@ -227,6 +191,7 @@ export async function getSettings(): Promise<SettingsDoc> {
 }
 
 export async function updateSettings(
+  userId: string,
   patch: Partial<Pick<SettingsDoc, "brandVoice" | "bannedWords">>
 ): Promise<void> {
   unwrap(
@@ -234,7 +199,7 @@ export async function updateSettings(
       .from("settings")
       .upsert(
         {
-          id: "global",
+          id: userId,
           ...(patch.brandVoice ? { brand_voice: patch.brandVoice } : {}),
           ...(patch.bannedWords ? { banned_words: patch.bannedWords } : {}),
         },
@@ -244,8 +209,21 @@ export async function updateSettings(
   );
 }
 
-export async function getPostById(id: string): Promise<Post | null> {
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+const isUuid = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
+
+/** This user's post, or null if it doesn't exist or belongs to someone else. */
+export async function getPostById(userId: string, id: string): Promise<Post | null> {
+  if (!isUuid(id)) return null;
+  const row = unwrap(
+    await getSupabase().from("posts").select("*").eq("id", id).eq("user_id", userId).maybeSingle(),
+    "Could not load post"
+  ) as PostRow | null;
+  return row ? serializePost(row) : null;
+}
+
+/** For the n8n callback only. */
+export async function getPostByIdAsSystem(id: string): Promise<Post | null> {
+  if (!isUuid(id)) return null;
   const row = unwrap(
     await getSupabase().from("posts").select("*").eq("id", id).maybeSingle(),
     "Could not load post"
@@ -262,7 +240,7 @@ export interface HomeData {
   recent: Post[];
 }
 
-export async function getHomeData(): Promise<HomeData> {
+export async function getHomeData(userId: string): Promise<HomeData> {
   const supabase = getSupabase();
 
   const now = new Date();
@@ -276,13 +254,14 @@ export async function getHomeData(): Promise<HomeData> {
     comingUpRes,
     recentRes,
   ] = await Promise.all([
-    countPosts({ status: "published", updatedSince: monthStart }),
-    countPosts({ status: "waiting_approval" }),
-    countPosts({ status: "failed" }),
-    countPosts({ status: "scheduled" }),
+    countPosts(userId, { status: "published", updatedSince: monthStart }),
+    countPosts(userId, { status: "waiting_approval" }),
+    countPosts(userId, { status: "failed" }),
+    countPosts(userId, { status: "scheduled" }),
     supabase
       .from("posts")
       .select("*")
+      .eq("user_id", userId)
       .eq("status", "scheduled")
       .order("post_date")
       .order("post_time")
@@ -290,6 +269,7 @@ export async function getHomeData(): Promise<HomeData> {
     supabase
       .from("posts")
       .select("*")
+      .eq("user_id", userId)
       .in("status", ["published", "failed"])
       .order("updated_at", { ascending: false })
       .limit(3),
@@ -305,9 +285,9 @@ export async function getHomeData(): Promise<HomeData> {
   };
 }
 
-export async function getCalendarPosts(): Promise<Post[]> {
+export async function getCalendarPosts(userId: string): Promise<Post[]> {
   const rows = unwrap(
-    await getSupabase().from("posts").select("*").order("post_date").order("post_time"),
+    await getSupabase().from("posts").select("*").eq("user_id", userId).order("post_date").order("post_time"),
     "Could not load calendar"
   ) as PostRow[];
   return rows.map(serializePost);
@@ -317,9 +297,14 @@ export interface ActivityData {
   posts: Post[];
 }
 
-export async function getActivityData(): Promise<ActivityData> {
+export async function getActivityData(userId: string): Promise<ActivityData> {
   const rows = unwrap(
-    await getSupabase().from("posts").select("*").order("updated_at", { ascending: false }).limit(200),
+    await getSupabase()
+      .from("posts")
+      .select("*")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(200),
     "Could not load posts"
   ) as PostRow[];
   return { posts: rows.map(serializePost) };

@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Setup after import\n\n**Credentials to select**\n- **Header Auth account** (webhooks + callbacks). Header name `x-api-key`, value = `N8N_WEBHOOK_API_KEY`. Set `N8N_CALLBACK_SECRET` in the dashboard to the same value.\n- **Anthropic account**: 3 Claude nodes\n- *Generate Image* uses n8n's free **Gateway credits** (OpenAI). Claude has no image output, so Claude writes the prompt and OpenAI renders it\n- **LinkedIn account**\n- **Facebook Graph account**: a **Page** access token with `pages_manage_posts`, `pages_read_engagement`, `instagram_basic`, `instagram_content_publish`\n\n**IDs to set** in *Normalize Publish Request*\n- `facebookPageId`\n- `instagramAccountId`: the Instagram *Business* Account ID, **not** the Page ID (`GET /{page-id}?fields=instagram_business_account`)\n\n**Storage**: no credential needed. The dashboard sends a one-off Supabase signed upload URL with each request.",
+        "content": "## Setup after import\n\n**Credentials to select**\n- **Header Auth account** (webhooks + callbacks). Header name `x-api-key`, value = `N8N_WEBHOOK_API_KEY`. Set `N8N_CALLBACK_SECRET` in the dashboard to the same value.\n- **Anthropic account**: 3 Claude nodes\n- *Generate Image* uses n8n's free **Gateway credits** (OpenAI). Claude has no image output, so Claude writes the prompt and OpenAI renders it\n\n**No LinkedIn / Facebook credentials here.** Each user connects their own accounts in the dashboard (Settings → Connected accounts). The dashboard sends that user's tokens with every publish request, so this one workflow posts for every user.\n\n**Privacy**: publish executions contain those tokens. In *Workflow settings*, set **Save successful production executions** to *Do not save*.\n\n**Storage**: no credential needed. The dashboard sends a one-off Supabase signed upload URL with each request.",
         "height": 700,
         "width": 460,
         "color": 6
@@ -532,7 +532,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Your account IDs. Instagram needs the Instagram *Business* Account ID linked to the\n// Facebook Page (Graph API: GET /{page-id}?fields=instagram_business_account), not the Page ID.\nconst ACCOUNTS = {\n  facebookPageId: '1458689310655772',\n  instagramAccountId: '17841454200168580',\n};\n\nconst b = $json.body ?? $json;\nconst allowed = ['linkedin', 'instagram', 'facebook'];\nif (!b.postId || !Array.isArray(b.platforms) || !b.platforms.length || !b.callbackUrl)\n  throw new Error('postId, platforms and callbackUrl are required');\nif (b.platforms.some(p => !allowed.includes(p))) throw new Error('Unsupported platform in request');\n\nconst withTags = c => {\n  const text = String(c?.text || '');\n  const tags = (Array.isArray(c?.hashtags) ? c.hashtags : [])\n    .map(h => '#' + String(h).replace(/^#/, ''))\n    .filter(h => !text.includes(h));\n  return tags.length ? text + '\\n\\n' + tags.join(' ') : text;\n};\n\nreturn [{ json: {\n  postId: String(b.postId),\n  scheduledAt: b.scheduledAt ?? null,\n  callbackUrl: b.callbackUrl,\n  platformPosts: b.platforms.map(platform => ({\n    platform,\n    message: withTags(b.content?.[platform]),\n    imageUrl: b.imageUrl ?? null,\n  })),\n  accounts: ACCOUNTS,\n} }];"
+        "jsCode": "// The dashboard sends the post owner's own connected accounts:\n// accounts[platform] = { accountId, accountName, token }\n//   facebook  → accountId = Facebook Page id,  token = Page token\n//   instagram → accountId = Instagram user id, token = the Page token\n//   linkedin  → accountId = urn:li:person:…,   token = member token\nconst b = $json.body ?? $json;\nconst allowed = ['linkedin', 'instagram', 'facebook'];\nif (!b.postId || !Array.isArray(b.platforms) || !b.platforms.length || !b.callbackUrl)\n  throw new Error('postId, platforms and callbackUrl are required');\nif (b.platforms.some(p => !allowed.includes(p))) throw new Error('Unsupported platform in request');\nconst missing = b.platforms.filter(p => !b.accounts?.[p]?.token || !b.accounts?.[p]?.accountId);\nif (missing.length) throw new Error('No connected account for: ' + missing.join(', '));\n\nconst tagList = c => (Array.isArray(c?.hashtags) ? c.hashtags : []).map(h => String(h).replace(/^#/, '')).filter(Boolean);\n\nconst withTags = c => {\n  const text = String(c?.text || '');\n  const tags = tagList(c).map(h => '#' + h).filter(h => !text.includes(h));\n  return tags.length ? text + '\\n\\n' + tags.join(' ') : text;\n};\n\n// LinkedIn \"little text\": reserved characters must be escaped or the post is cut off;\n// hashtags use LinkedIn's own template so they stay clickable.\nconst liEscape = s => String(s).replace(/[\\\\|{}@\\[\\]()<>#*_~]/g, ch => '\\\\' + ch);\nconst forLinkedIn = c => {\n  const tags = tagList(c).map(h => `{hashtag|\\\\#|${h}}`);\n  const text = liEscape(c?.text || '');\n  return tags.length ? text + '\\n\\n' + tags.join(' ') : text;\n};\n\nreturn [{ json: {\n  postId: String(b.postId),\n  scheduledAt: b.scheduledAt ?? null,\n  callbackUrl: b.callbackUrl,\n  platformPosts: b.platforms.map(platform => ({\n    platform,\n    message: platform === 'linkedin' ? forLinkedIn(b.content?.[platform]) : withTags(b.content?.[platform]),\n    imageUrl: b.imageUrl ?? null,\n    accountId: String(b.accounts[platform].accountId),\n    token: b.accounts[platform].token,\n  })),\n} }];"
       },
       "id": "f9f12465-14e8-51f3-ab70-8b9883c39a6c",
       "name": "Normalize Publish Request",
@@ -754,12 +754,57 @@
       "typeVersion": 2.2,
       "position": [
         1580,
-        680
+        660
       ]
     },
     {
       "parameters": {
-        "url": "={{ $json.imageUrl }}",
+        "method": "POST",
+        "url": "https://api.linkedin.com/rest/images?action=initializeUpload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Platform Router').item.json.token }}"
+            },
+            {
+              "name": "LinkedIn-Version",
+              "value": "202606"
+            },
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ initializeUploadRequest: { owner: $('Platform Router').item.json.accountId } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "da2900cf-8858-5f89-9f69-d7567dfdf5ac",
+      "name": "Init LinkedIn Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        580
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Platform Router').item.json.imageUrl }}",
         "options": {
           "response": {
             "response": {
@@ -775,59 +820,90 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1800,
-        600
-      ],
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "person": "nM2WnL56sa",
-        "text": "={{ $('Platform Router').item.json.message }}",
-        "shareMediaCategory": "IMAGE",
-        "binaryPropertyName": "data",
-        "additionalFields": {
-          "visibility": "PUBLIC"
-        }
-      },
-      "id": "d81010aa-d912-5346-a4d3-57e6620140ed",
-      "name": "Publish LinkedIn (Image)",
-      "type": "n8n-nodes-base.linkedIn",
-      "typeVersion": 1,
-      "position": [
         2020,
-        600
+        580
       ],
-      "credentials": {
-        "linkedInOAuth2Api": {
-          "id": "grEjxSsdp6QTs1BJ",
-          "name": "LinkedIn account"
-        }
-      },
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "person": "nM2WnL56sa",
-        "text": "={{ $json.message }}",
-        "additionalFields": {
-          "visibility": "PUBLIC"
+        "method": "PUT",
+        "url": "={{ $('Init LinkedIn Upload').item.json.body.value.uploadUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Platform Router').item.json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
         }
       },
-      "id": "e918c69e-8eb7-58cc-9033-afb285f2600e",
-      "name": "Publish LinkedIn",
-      "type": "n8n-nodes-base.linkedIn",
-      "typeVersion": 1,
+      "id": "871bea96-e156-58f9-973c-7baa725a3eef",
+      "name": "Upload Image to LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
-        1800,
-        760
+        2240,
+        580
       ],
-      "credentials": {
-        "linkedInOAuth2Api": {
-          "id": "grEjxSsdp6QTs1BJ",
-          "name": "LinkedIn account"
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/rest/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Platform Router').item.json.token }}"
+            },
+            {
+              "name": "LinkedIn-Version",
+              "value": "202606"
+            },
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ author: $('Platform Router').item.json.accountId, commentary: $('Platform Router').item.json.message, visibility: 'PUBLIC', distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false, ...($('Init LinkedIn Upload').isExecuted ? { content: { media: { id: $('Init LinkedIn Upload').item.json.body.value.image } } } : {}) }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
         }
       },
+      "id": "4b4692d6-7772-5d87-a546-fff73cab800a",
+      "name": "Publish LinkedIn Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2460,
+        700
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -866,39 +942,43 @@
     },
     {
       "parameters": {
-        "httpRequestMethod": "POST",
-        "graphApiVersion": "v23.0",
-        "node": "={{ $json.accounts.instagramAccountId }}",
-        "edge": "media",
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/{{ $json.accountId }}/media",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "image_url",
+              "value": "={{ $json.imageUrl }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $json.token }}"
+            }
+          ]
+        },
         "options": {
-          "queryParameters": {
-            "parameter": [
-              {
-                "name": "image_url",
-                "value": "={{ $json.imageUrl }}"
-              },
-              {
-                "name": "caption",
-                "value": "={{ $json.message }}"
-              }
-            ]
-          }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
         }
       },
       "id": "0846c2d4-6724-5bc5-a553-20f103efa8a3",
       "name": "Create Instagram Media",
-      "type": "n8n-nodes-base.facebookGraphApi",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         1800,
         1020
       ],
-      "credentials": {
-        "facebookGraphApi": {
-          "id": "K16JQxc47yQCnZl9",
-          "name": "Facebook Graph account"
-        }
-      },
       "onError": "continueRegularOutput"
     },
     {
@@ -918,66 +998,76 @@
     },
     {
       "parameters": {
-        "httpRequestMethod": "POST",
-        "graphApiVersion": "v23.0",
-        "node": "={{ $('Platform Router').item.json.accounts.instagramAccountId }}",
-        "edge": "media_publish",
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/{{ $('Platform Router').item.json.accountId }}/media_publish",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{ $('Create Instagram Media').item.json.body.id }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $('Platform Router').item.json.token }}"
+            }
+          ]
+        },
         "options": {
-          "queryParameters": {
-            "parameter": [
-              {
-                "name": "creation_id",
-                "value": "={{ $('Create Instagram Media').item.json.id }}"
-              }
-            ]
-          }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
         }
       },
       "id": "06e02b77-891d-5d7d-aa51-e380bd5be86e",
       "name": "Publish Instagram",
-      "type": "n8n-nodes-base.facebookGraphApi",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         2240,
         1020
       ],
-      "credentials": {
-        "facebookGraphApi": {
-          "id": "K16JQxc47yQCnZl9",
-          "name": "Facebook Graph account"
-        }
-      },
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "graphApiVersion": "v23.0",
-        "node": "={{ $json.id }}",
+        "method": "GET",
+        "url": "=https://graph.facebook.com/v23.0/{{ $json.body.id }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "permalink"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $('Platform Router').item.json.token }}"
+            }
+          ]
+        },
         "options": {
-          "queryParameters": {
-            "parameter": [
-              {
-                "name": "fields",
-                "value": "permalink"
-              }
-            ]
-          }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
         }
       },
       "id": "54782344-6346-5ac8-9e52-86782e6d81ea",
       "name": "Get Instagram Permalink",
-      "type": "n8n-nodes-base.facebookGraphApi",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         2460,
         1020
       ],
-      "credentials": {
-        "facebookGraphApi": {
-          "id": "K16JQxc47yQCnZl9",
-          "name": "Facebook Graph account"
-        }
-      },
       "onError": "continueRegularOutput"
     },
     {
@@ -996,34 +1086,45 @@
     },
     {
       "parameters": {
-        "httpRequestMethod": "POST",
-        "graphApiVersion": "v23.0",
-        "node": "={{ $json.accounts.facebookPageId }}",
-        "edge": "={{ $json.imageUrl ? 'photos' : 'feed' }}",
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v23.0/{{ $json.accountId }}/{{ $json.imageUrl ? 'photos' : 'feed' }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "access_token",
+              "value": "={{ $json.token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.imageUrl ? { url: $json.imageUrl, caption: $json.message } : { message: $json.message }) }}",
         "options": {
-          "queryParametersJson": "={{ JSON.stringify($json.imageUrl ? { url: $json.imageUrl, caption: $json.message } : { message: $json.message }) }}"
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
         }
       },
       "id": "74519a11-7789-5993-9059-cfde5037d0b7",
       "name": "Publish Facebook",
-      "type": "n8n-nodes-base.facebookGraphApi",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         1580,
         1360
       ],
-      "credentials": {
-        "facebookGraphApi": {
-          "id": "K16JQxc47yQCnZl9",
-          "name": "Facebook Graph account"
-        }
-      },
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const src = $('Platform Router').item.json;\nconst r = { ...$json };\n// n8n's \"Bad request\" hides the platform's own reason; pull it out of whatever the node returned.\nconst e = r.error;\nconst graph = e?.error ?? r.cause?.error ?? r.response?.body?.error; // Facebook/Instagram Graph API body\nconst parts = e ? [\n  typeof e === 'string' ? e : e.message,\n  e.description ?? r.description,\n  graph?.message ?? graph?.error_user_msg,\n  graph?.code ? 'code ' + graph.code + (graph.error_subcode ? '/' + graph.error_subcode : '') : null,\n] : [];\nconst err = e\n  ? [...new Set(parts.filter(Boolean).map(String))].join(' | ') || JSON.stringify(e)\n  : (Number(r.statusCode ?? 200) >= 400 ? JSON.stringify(r) : null);\n\nlet url = r.url ?? r.permalink ?? r.postUrl ?? null;\nif (!err && !url) {\n  if (src.platform === 'linkedin' && (r.urn || r.id)) url = 'https://www.linkedin.com/feed/update/' + (r.urn || r.id);\n  if (src.platform === 'facebook' && (r.post_id || r.id)) url = 'https://www.facebook.com/' + (r.post_id || r.id);\n}\n\nconst result = err\n  ? { status: 'failed', error: err }\n  : { status: 'published', ...(url ? { url } : {}), publishedAt: new Date().toISOString() };\n\nreturn { json: {\n  postId: src.postId,\n  callbackUrl: src.callbackUrl,\n  platform: src.platform,\n  platformResults: { [src.platform]: result },\n} };"
+        "jsCode": "const src = $('Platform Router').item.json;\nconst ran = n => { try { return $(n).isExecuted; } catch { return false; } };\nconst out = n => (ran(n) ? $(n).item.json : null);\n\n// Every platform call returns { statusCode, headers, body }; the first failing step decides the result.\nconst steps = {\n  linkedin: ['Init LinkedIn Upload', 'Download Image for LinkedIn', 'Upload Image to LinkedIn', 'Publish LinkedIn Post'],\n  instagram: ['Create Instagram Media', 'Publish Instagram', 'Get Instagram Permalink'],\n  facebook: ['Publish Facebook'],\n}[src.platform] ?? [];\n\nlet error = null;\nlet reconnectNeeded = false;\nif (src.platform === 'instagram' && ran('Instagram Needs Image')) error = $('Instagram Needs Image').item.json.error;\n\nfor (const step of steps) {\n  if (error) break;\n  const r = out(step);\n  if (!r) continue;\n  const status = Number(r.statusCode ?? (r.error ? 500 : 200));\n  if (status < 400 && !r.error) continue;\n  const body = typeof r.body === 'string' ? (() => { try { return JSON.parse(r.body); } catch { return { message: r.body }; } })() : (r.body ?? {});\n  const g = body.error ?? {}; // Facebook / Instagram Graph error\n  const msg = g.error_user_msg || g.message || body.message || r.error?.message || ('HTTP ' + status);\n  error = step + ': ' + msg + (g.code ? ' (code ' + g.code + (g.error_subcode ? '/' + g.error_subcode : '') + ')' : '');\n  // Token revoked / expired: the dashboard asks the user to connect this account again.\n  reconnectNeeded = status === 401 || g.code === 190 || body.serviceErrorCode === 65600;\n}\n\nlet url = null;\nif (!error) {\n  if (src.platform === 'linkedin') {\n    const h = out('Publish LinkedIn Post')?.headers ?? {};\n    const urn = h['x-restli-id'] ?? h['x-linkedin-id'];\n    if (urn) url = 'https://www.linkedin.com/feed/update/' + urn;\n  }\n  if (src.platform === 'instagram') url = out('Get Instagram Permalink')?.body?.permalink ?? null;\n  if (src.platform === 'facebook') {\n    const b = out('Publish Facebook')?.body ?? {};\n    if (b.post_id || b.id) url = 'https://www.facebook.com/' + (b.post_id || b.id);\n  }\n}\n\nconst result = error\n  ? { status: 'failed', error, ...(reconnectNeeded ? { reconnectNeeded: true } : {}) }\n  : { status: 'published', ...(url ? { url } : {}), publishedAt: new Date().toISOString() };\n\n// Only what the dashboard needs goes back: never the token.\nreturn { json: {\n  postId: src.postId,\n  callbackUrl: src.callbackUrl,\n  platformResults: { [src.platform]: result },\n} };"
       },
       "id": "6fdec944-44d3-5250-915e-ecc4249a6f7c",
       "name": "Normalize Publish Result",
@@ -1407,14 +1508,25 @@
       "main": [
         [
           {
-            "node": "Download Image for LinkedIn",
+            "node": "Init LinkedIn Upload",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Publish LinkedIn",
+            "node": "Publish LinkedIn Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init LinkedIn Upload": {
+      "main": [
+        [
+          {
+            "node": "Download Image for LinkedIn",
             "type": "main",
             "index": 0
           }
@@ -1425,7 +1537,18 @@
       "main": [
         [
           {
-            "node": "Publish LinkedIn (Image)",
+            "node": "Upload Image to LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Image to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Publish LinkedIn Post",
             "type": "main",
             "index": 0
           }
@@ -1483,18 +1606,7 @@
         ]
       ]
     },
-    "Publish LinkedIn": {
-      "main": [
-        [
-          {
-            "node": "Normalize Publish Result",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Publish LinkedIn (Image)": {
+    "Publish LinkedIn Post": {
       "main": [
         [
           {

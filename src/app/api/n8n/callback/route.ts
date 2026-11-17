@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getPostById, updatePost } from "@/lib/db";
+import { markReconnectNeeded } from "@/lib/connections";
+import { getPostByIdAsSystem, updatePostAsSystem } from "@/lib/db";
 import { getSupabase, notifyDashboard } from "@/lib/supabase";
 import type { Platform, PlatformContent, PlatformResult, PostStatus } from "@/lib/types";
 
@@ -25,6 +26,8 @@ import type { Platform, PlatformContent, PlatformResult, PostStatus } from "@/li
 //
 // Publish callback:
 // { "postId": "<uuid>", "platformResults": { "linkedin": { "status": "published", "url": "..." } } }
+// A failed result may add "reconnectNeeded": true when the platform rejected the token
+// (Facebook error 190, LinkedIn 401). The owner's connection is then flagged for reconnecting.
 const STATUSES: PostStatus[] = ["processing", "waiting_approval", "scheduled", "published", "failed", "rejected"];
 const RESULT_STATUSES: PlatformResult["status"][] = ["not_sent", "scheduled", "published", "failed"];
 
@@ -41,7 +44,7 @@ export async function POST(req: NextRequest) {
     warnings?: string[];
     status?: PostStatus;
     error?: string;
-    platformResults?: Partial<Record<Platform, PlatformResult>>;
+    platformResults?: Partial<Record<Platform, PlatformResult & { reconnectNeeded?: boolean }>>;
   };
   try {
     body = await req.json();
@@ -57,7 +60,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid post status" }, { status: 400 });
   }
 
-  const existing = await getPostById(postId);
+  const existing = await getPostByIdAsSystem(postId);
   if (!existing) {
     return NextResponse.json({ error: "Post not found" }, { status: 404 });
   }
@@ -72,10 +75,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unknown platform in publish results" }, { status: 400 });
     }
 
+    const results: Partial<Record<Platform, PlatformResult>> = {};
+    for (const [platform, { reconnectNeeded, ...result }] of Object.entries(platformResults) as [
+      Platform,
+      PlatformResult & { reconnectNeeded?: boolean },
+    ][]) {
+      results[platform] = result;
+      if (reconnectNeeded) await markReconnectNeeded(existing.userId, platform);
+    }
+
     // Atomic merge + final status, see supabase/schema.sql.
     const { error: rpcError } = await getSupabase().rpc("apply_publish_results", {
       p_id: postId,
-      p_results: platformResults,
+      p_results: results,
     });
     if (rpcError) {
       return NextResponse.json({ error: rpcError.message }, { status: 500 });
@@ -85,7 +97,7 @@ export async function POST(req: NextRequest) {
   }
 
   const nextStatus: PostStatus = status ?? (error ? "failed" : "waiting_approval");
-  await updatePost(postId, {
+  await updatePostAsSystem(postId, {
     ...(imageUrl ? { imageUrl } : {}),
     ...(content ? { content: { ...existing.content, ...content } } : {}),
     ...(warnings ? { warnings } : {}),

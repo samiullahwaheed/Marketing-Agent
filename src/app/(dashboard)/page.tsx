@@ -1,6 +1,7 @@
 import { Clock, Lightbulb, Plus, TriangleAlert, Unlink } from "lucide-react";
 import Link from "next/link";
-import { countPosts, getHomeData, getAccounts, getSettings } from "@/lib/db";
+import { getAccounts } from "@/lib/connections";
+import { countPosts, getHomeData, getSettings } from "@/lib/db";
 import { todayLong, formatDayMonth, shortDay } from "@/lib/format";
 import { PLATFORMS } from "@/lib/platforms";
 import { postLink } from "@/lib/status";
@@ -10,6 +11,7 @@ import { Chip } from "@/components/Chip";
 import { PlatformBadge } from "@/components/PlatformBadge";
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
+import { requireUserId } from "@/lib/users";
 
 const row = "flex flex-wrap items-center py-4 border-t border-divider";
 
@@ -34,16 +36,17 @@ function sumViews(post: { results?: Partial<Record<string, { views?: number }>> 
 }
 
 export default async function HomePage() {
+  const userId = await requireUserId();
   const [home, accounts, settings] = await Promise.all([
-    getHomeData(),
-    getAccounts(),
-    getSettings(),
+    getHomeData(userId),
+    getAccounts(userId),
+    getSettings(userId),
   ]);
 
   const reconnectAccounts = accounts.filter((a) => a.status === "reconnect");
   let blockedCount = 0;
   if (reconnectAccounts.length > 0) {
-    blockedCount = await countPosts({
+    blockedCount = await countPosts(userId, {
       status: ["waiting_approval", "scheduled"],
       platforms: reconnectAccounts.map((a) => a.platform),
     });
@@ -51,6 +54,16 @@ export default async function HomePage() {
   const creditsLow = settings.aiCreditsPercent <= 20;
 
   const needsYou: NeedsYouItem[] = [];
+  if (accounts.every((a) => a.status === "not_connected")) {
+    needsYou.push({
+      id: "connect",
+      tone: "warning",
+      icon: "unlink",
+      title: "Connect your social accounts to start posting",
+      detail: "Link your Facebook Page, Instagram or LinkedIn in Settings. It takes a minute.",
+      action: { label: "Connect accounts", href: "/settings", variant: "primary" },
+    });
+  }
   if (home.waitingCount > 0) {
     needsYou.push({
       id: "waiting",

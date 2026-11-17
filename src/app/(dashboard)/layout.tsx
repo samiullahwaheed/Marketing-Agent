@@ -1,6 +1,6 @@
 import AppLayout from "@/components/AppLayout";
 import { countPosts, getSettings } from "@/lib/db";
-import { getCurrentUser } from "@/lib/users";
+import { getCurrentUser, requireUserId } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
@@ -9,9 +9,10 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const userId = await requireUserId();
   const [settings, pendingCount, user] = await Promise.all([
-    getSettings(),
-    countPosts({ status: "waiting_approval" }),
+    getSettings(userId),
+    countPosts(userId, { status: "waiting_approval" }),
     getCurrentUser(),
   ]);
 

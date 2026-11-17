@@ -1,6 +1,5 @@
 "use server";
 
-import { timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { type FieldErrors, type SignupField, validateSignupField } from "@/lib/account-rules";
@@ -30,15 +29,6 @@ async function startSession(userId: string) {
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   });
-}
-
-/** Sign-up is invite-only: the team code (or, if unset, the old dashboard password) gates it. */
-function accessCodeMatches(code: string): boolean {
-  const expected = process.env.SIGNUP_ACCESS_CODE || process.env.DASHBOARD_PASSWORD;
-  if (!expected) return false;
-  const a = Buffer.from(code);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 export async function loginAction(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -72,7 +62,6 @@ export async function signupAction(_prev: AuthFormState, formData: FormData): Pr
     name: String(formData.get("name") || ""),
     email: String(formData.get("email") || ""),
     password: String(formData.get("password") || ""),
-    accessCode: String(formData.get("accessCode") || ""),
   };
   const values = { name: fields.name, email: fields.email };
 
@@ -80,9 +69,6 @@ export async function signupAction(_prev: AuthFormState, formData: FormData): Pr
   for (const f of Object.keys(fields) as SignupField[]) {
     const e = validateSignupField(f, fields[f]);
     if (e) errors[f] = e;
-  }
-  if (!errors.accessCode && !accessCodeMatches(fields.accessCode.trim())) {
-    errors.accessCode = "That access code isn't right. Check it with your workspace admin.";
   }
   if (Object.keys(errors).length) return { errors, values };
 
@@ -99,7 +85,7 @@ export async function signupAction(_prev: AuthFormState, formData: FormData): Pr
   }
 
   await startSession(userId);
-  redirect("/");
+  redirect("/settings");
 }
 
 export async function logoutAction(): Promise<void> {

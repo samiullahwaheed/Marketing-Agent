@@ -1,6 +1,6 @@
 /** Field rules shared by the sign-up form (checks on blur) and the server action (final say). */
 
-export type SignupField = "name" | "email" | "password" | "accessCode";
+export type SignupField = "name" | "email" | "password";
 export type FieldErrors<F extends string> = Partial<Record<F, string>>;
 
 export const PASSWORD_RULES = [
@@ -37,8 +37,5 @@ export function validateSignupField(field: SignupField, value: string): string |
       if (missing.length) return `Your password needs ${missing.join(", ")}.`;
       return;
     }
-    case "accessCode":
-      if (!v) return "Enter the team access code. Ask your workspace admin if you don't have it.";
-      return;
   }
 }

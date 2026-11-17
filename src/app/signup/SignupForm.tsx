@@ -9,7 +9,7 @@ import { type AuthFormState, signupAction } from "../login/actions";
 
 export default function SignupForm() {
   const [state, formAction, pending] = useActionState<AuthFormState, FormData>(signupAction, {});
-  const [values, setValues] = useState<Record<SignupField, string>>({ name: "", email: "", password: "", accessCode: "" });
+  const [values, setValues] = useState<Record<SignupField, string>>({ name: "", email: "", password: "" });
   // Fields the user has left (or edited after a submit): these show live client-side checks.
   const [touched, setTouched] = useState<Partial<Record<SignupField, boolean>>>({});
   const formRef = useRef<HTMLFormElement>(null);
@@ -73,16 +73,6 @@ export default function SignupForm() {
             <PasswordInput {...a} {...bind("password")} autoComplete="new-password" placeholder="Create a password" required />
             <PasswordStrength password={values.password} />
           </div>
-        )}
-      </Field>
-
-      <Field
-        label="Team access code"
-        error={errors.accessCode}
-        hint="Sign-up is invite-only, so only your team can post to your accounts. Your workspace admin has the code."
-      >
-        {(a) => (
-          <TextInput {...a} {...bind("accessCode")} type="text" autoComplete="off" autoCapitalize="none" spellCheck={false} required />
         )}
       </Field>
 

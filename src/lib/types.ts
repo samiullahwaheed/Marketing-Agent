@@ -29,6 +29,8 @@ export interface PlatformResult {
 
 export interface PostDoc {
   id?: string;
+  /** Owner. Every read and write is scoped to it. */
+  userId: string;
   topic: string;
   date: string;
   time: string;
@@ -61,16 +63,17 @@ export interface Post extends Omit<PostDoc, "id" | "createdAt" | "updatedAt"> {
   updatedAt: string;
 }
 
-export interface AccountDoc {
+/** A platform as the signed-in user sees it: connected (with which account), expired, or not connected. */
+export interface Account {
+  id: string;
   platform: Platform;
   label: string;
   status: AccountStatus;
-  updatedAt: Date;
-}
-
-export interface Account extends Omit<AccountDoc, "updatedAt"> {
-  id: string;
-  updatedAt: string;
+  /** The Page / profile name, when connected. */
+  accountName?: string;
+  /** When the connection stops working; absent if it doesn't expire. */
+  expiresAt?: string;
+  updatedAt?: string;
 }
 
 export interface BrandVoiceDoc {
